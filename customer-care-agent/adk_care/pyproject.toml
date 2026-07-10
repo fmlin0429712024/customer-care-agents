@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "care-adk-agent"
+version = "0.1.0"
+description = "Customer Care Coordinator built with Google ADK and Gemini"
+requires-python = ">=3.11"
+dependencies = [
+    "google-adk>=1.31.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["care_agent"]
+
+# Bundle the verbatim Claude-Code SKILL.md tree into the wheel (same principle
+# as the worker) so the agent is self-contained.
+[tool.hatch.build.targets.wheel.force-include]
+"care_agent/skills" = "care_agent/skills"
