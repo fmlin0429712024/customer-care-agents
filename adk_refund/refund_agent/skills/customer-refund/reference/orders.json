@@ -1,0 +1,35 @@
+{
+  "orders": [
+    {
+      "order_id": "12345",
+      "customer_id": "CUST001",
+      "amount": 99.00,
+      "status": "delivered",
+      "order_date": "2026-07-02",
+      "delivery_date": "2026-07-02",
+      "product": "Widget Pro"
+    },
+    {
+      "order_id": "67890",
+      "customer_id": "CUST002",
+      "amount": 49.00,
+      "status": "delivered",
+      "order_date": "2026-07-07",
+      "delivery_date": "2026-07-07",
+      "product": "Basic Widget"
+    },
+    {
+      "order_id": "11111",
+      "customer_id": "CUST003",
+      "amount": 29.00,
+      "status": "in_transit",
+      "order_date": "2026-07-08",
+      "delivery_date": null,
+      "product": "Mini Widget"
+    }
+  ],
+  "notes": {
+    "reference_date": "2026-07-09",
+    "days_since_delivery_is_computed": "days_since_delivery = reference_date - delivery_date, recalculate against the actual current date when testing on a different day"
+  }
+}

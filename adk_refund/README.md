@@ -1,219 +1,150 @@
-# Customer Refund Agent — Google ADK Implementation
+# Customer Refund Agent — Google ADK
 
-Production-ready ADK implementation of the customer refund processing pipeline using Gemini 2.5 Pro on Google Cloud.
+A textbook-layout [Agent Development Kit](https://adk.dev) agent that processes
+customer refund requests. It is a four-stage `SequentialAgent` pipeline built on
+a clean split:
 
-## Quick Start
+- **Policy lives in `SKILL.md`.** Each stage loads the verbatim `SKILL.md`
+  files that Claude Code produced, bundled under `refund_agent/skills/`. They
+  are byte-for-byte identical to `.claude/skills/customer-refund/`, proving a
+  Claude-Code skill deploys to ADK unchanged. Change policy → edit the SKILL.md.
+- **Data access lives in `tools.py`.** Deterministic operations (order lookup,
+  refund history, ticket creation) are ADK `FunctionTools` backed by SQLite, so
+  the LLM never guesses order data, date math, or ticket numbers.
 
-### 1. Setup
+## Learning roadmap — local ADK → Gemini Enterprise Agent Platform
+
+The goal is to experience the whole pipeline, one solid step at a time. CLI
+where possible (assistant-driven); portal only for viewing / enterprise setup.
+
+| # | Milestone | How | Status |
+|---|-----------|-----|--------|
+| 0 | Local textbook agent + playground | `adk web` | ✅ done |
+| 1 | **Observability — tracing** | Cloud Trace + LangSmith, dual export | ✅ **done** 🎉 |
+| — | Governance — PII guardrail | ADK Plugin, redaction (local) | ✅ done |
+| 2 | **Deploy to Cloud Run** (single region `us-central1`) | container + service account + secrets | ✅ **done** 🎉 [live](https://refund-agent-xwbl4hgnja-uc.a.run.app) |
+| 2.5 | Data layer: SQLite → Firestore | swap `tools.py` internals, agent unchanged | ✅ **done** |
+| 3 | Deploy to Agent Engine (managed agent tier) | `adk deploy agent_engine` (Vertex backend) | ⬜ |
+| 4 | **Evaluation** | `adk eval` — golden set, offline regression gate | ✅ **done** (4/4 pass) |
+| 5 | Managed Sessions / Memory | swap InMemory for platform-managed state | ⬜ |
+| 6 | Governance (managed) | Model Armor / enterprise IAM / quotas (portal) | ⬜ |
+| 7 | Gemini Enterprise surface | register the agent to Agentspace (portal) | ⬜ |
+
+Tiers: **local → Cloud Run** (managed infra + scaling) **→ Agent Engine** (managed agent services). Multi-region + load balancer is concept-only.
+
+### Docs (growing series in [`docs/`](docs/))
+
+| # | Doc | Covers |
+|---|-----|--------|
+| 01 | [Observability: Tracing](docs/01-observability-tracing.md) | Cloud Trace + LangSmith, dual export, granularity knobs |
+| 02 | [Governance: PII Redaction Guardrail](docs/02-governance-pii-guardrail.md) | ADK Plugin guardrail, redaction vs tokenization, managed vs custom |
+| 03 | [Deployment: Cloud Run](docs/03-cloud-run-deployment.md) ✅ | single-region deploy, container vs runtime config, service account |
+| 03.5 | [Data layer: SQLite → Firestore](docs/03.5-firestore-data-layer.md) ✅ | swap storage, touch one file; persistent + cross-instance |
+| 04 | [Evaluation: adk eval](docs/04-evaluation-adk-eval.md) ✅ | offline regression gate; thresholds absorb LLM non-determinism |
+
+> **Eval in one line:** `adk eval` is essentially **regression testing for CI/CD** —
+> run the whole golden set before every deploy; all-pass = safe to ship. It's an
+> ADK/offline feature, nothing to do with the Gemini Enterprise platform.
+
+Each milestone gets one page.
+
+## Layout
+
+```
+adk_refund/                        ← run `adk web` here
+└── refund_agent/                  ← agent package
+    ├── __init__.py                ← from . import agent
+    ├── agent.py                   ← defines root_agent (the pipeline)
+    ├── tools.py                   ← SQLite-backed FunctionTools (data access)
+    ├── .env                       ← GOOGLE_API_KEY, GOOGLE_GENAI_USE_VERTEXAI
+    ├── data/refund.db             ← generated on first run (git-ignored)
+    └── skills/customer-refund/    ← verbatim hard copy of the Claude-Code skill
+        ├── SKILL.md               ← orchestrator
+        ├── order-lookup/SKILL.md
+        ├── refund-policy/SKILL.md
+        ├── refund-decision/SKILL.md
+        ├── fraud-detection/SKILL.md
+        ├── escalation-rules/SKILL.md
+        ├── escalation-workflow/SKILL.md
+        ├── customer-communication/SKILL.md
+        └── reference/
+            ├── orders.json
+            └── test-scenarios.json
+```
+
+## Pipeline
+
+```
+order_lookup → refund_decision → fraud_detection → customer_communication
+```
+
+Each sub-agent writes its result to session state (`output_key`); the next
+stage reads it. Stages call tools where the work is deterministic:
+
+| Stage | Tool | Purpose |
+|-------|------|---------|
+| order_lookup | `lookup_order(order_id)` | Read the order record + compute days since delivery |
+| fraud_detection | `get_refund_history(customer_id)` | Count refunds in trailing 30 days |
+| customer_communication | `create_escalation_ticket(...)` | Mint a real ticket ID + SLA on escalation |
+
+The SQLite database is seeded on first use from the bundled
+`reference/orders.json`. In production you swap this layer for Cloud SQL /
+Firestore without touching the agents or the SKILL.md. Point `REFUND_DB_PATH`
+at a writable location (e.g. `/tmp/refund.db`) on read-only deploy targets.
+
+## Run the playground
 
 ```bash
-# Create Python environment
-python3.11 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
 cd adk_refund
-pip install -e .
-
-# Configure GCP credentials
-cp .env.example .env
-# Edit .env with your GCP project and credentials
+source venv/bin/activate       # or: pip install -e .
+adk web
 ```
 
-### 2. Set GCP Credentials
+Open the printed URL, pick **refund_agent**, and type e.g.:
+
+```
+Process refund for order 67890
+```
+
+Terminal alternative:
 
 ```bash
-# Option A: Service Account Key (local development)
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/gcp-service-account-key.json
-
-# Option B: Application Default Credentials (production)
-gcloud auth application-default login
+adk run refund_agent
 ```
 
-### 3. Run a Scenario
+**With tracing** (Cloud Trace + LangSmith, dual export):
 
 ```bash
-# Run scenario 1 (auto-approve)
-python run_refund.py scenario-1-auto-approve
-
-# Run scenario 2 with custom run name
-python run_refund.py scenario-2-past-window refund-run-02
-
-# List available scenarios
-ls data/scenario-*/
+set -a; source .env.local; set +a               # LangSmith key
+export GOOGLE_CLOUD_PROJECT=linkhealth-care-2024
+python serve_dual_trace.py                       # http://127.0.0.1:8001
 ```
 
-## Pipeline Stages
+See [docs/01 — Observability: Tracing](docs/01-observability-tracing.md) for the full setup, backends, and granularity knobs.
+
+## Test orders
+
+| Order | Amount | Status | Days since delivery | Expected |
+|-------|--------|--------|---------------------|----------|
+| 67890 | $49 | delivered | 2 | APPROVE — AUTO_APPROVED |
+| 12345 | $99 | delivered | 7 | ESCALATE — PAST_REFUND_WINDOW |
+| 11111 | $29 | in_transit | — | ESCALATE — IN_TRANSIT |
+| 99999 | — | not found | — | REJECT — ORDER_NOT_FOUND |
+
+## Configuration
+
+`refund_agent/.env` (read by ADK):
 
 ```
-Order Lookup (verify + extract)
-    ↓
-Refund Decision (apply rules)
-    ↓
-Fraud Detection (screen for abuse)
-    ↓
-Customer Communication (craft response)
+GOOGLE_GENAI_USE_VERTEXAI=FALSE
+GOOGLE_API_KEY=<your AI Studio key>
 ```
 
-## Test Scenarios
+To run on Vertex AI instead, set `GOOGLE_GENAI_USE_VERTEXAI=TRUE` with
+`GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_LOCATION` and authenticate via
+`gcloud auth application-default login`.
 
-| # | Scenario | Expected Decision | Reason Code |
-|---|----------|-------------------|------------|
-| 1 | scenario-1-auto-approve | APPROVE | AUTO_APPROVED |
-| 2 | scenario-2-past-window | ESCALATE | PAST_REFUND_WINDOW |
-| 3 | scenario-3-in-transit | ESCALATE | IN_TRANSIT |
-| 4 | scenario-4-not-found | REJECT | ORDER_NOT_FOUND |
-| 5 | scenario-5-high-value | ESCALATE | HIGH_VALUE_ORDER |
-| 6 | scenario-6-duplicate | ESCALATE | DUPLICATE_REFUND |
-| 7 | scenario-7-fraud-risk | ESCALATE | FRAUD_RISK |
+## Changing policy
 
-## Project Structure
-
-```
-adk_refund/
-├── refund_agent/
-│   ├── __init__.py
-│   ├── agent.py              # ADK agent definitions
-│   └── tools.py              # Tools and data loading
-├── data/
-│   ├── scenario-1-auto-approve/
-│   ├── scenario-2-past-window/
-│   ├── scenario-3-in-transit/
-│   ├── scenario-4-not-found/
-│   ├── scenario-5-high-value/
-│   ├── scenario-6-duplicate/
-│   └── scenario-7-fraud-risk/
-├── output/                   # Pipeline outputs saved here
-├── .env.example              # Environment template
-├── pyproject.toml
-├── run_refund.py             # Main entry point
-└── README.md
-```
-
-## Environment Variables
-
-```bash
-GOOGLE_CLOUD_PROJECT=linkhealth-care-2024
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
-GENAI_API_KEY=your-gemini-api-key
-ADK_MODEL=gemini-2.5-pro
-```
-
-## How It Works
-
-### 1. Order Lookup Stage
-- Verifies order exists in reference data
-- Extracts order details (amount, status, delivery date)
-- Calculates days since delivery
-- Outputs: ORDER LOOKUP RESULT
-
-### 2. Refund Decision Stage
-- Loads refund policy rules
-- Applies eligibility checks (5-day window, $500 cap, delivery status)
-- Produces decision: APPROVE / ESCALATE / REJECT
-- Outputs: REFUND DECISION with reason code
-
-### 3. Fraud Detection Stage
-- Screens tentative APPROVEs for abuse patterns
-- Checks: duplicate refunds, refund frequency (>3 in 30 days)
-- May override APPROVE → ESCALATE if flags detected
-- Outputs: FRAUD SCREEN RESULT
-
-### 4. Customer Communication Stage
-- Reads all previous stage outputs
-- Crafts appropriate customer-facing message
-- Tone varies by outcome: celebratory (APPROVE), empathetic (ESCALATE), helpful (REJECT)
-- Outputs: Customer response ready to send
-
-## Outputs
-
-Each run saves outputs to `output/{run_name}/`:
-- `pipeline-output.json` — Full pipeline results with all stages
-- Stage-specific files — Detailed output from each agent
-
-## Integration with Cloud Firestore
-
-To enable persistent state (future):
-
-```python
-from google.adk.sessions import FirestoreSessionService
-
-session_service = FirestoreSessionService(
-    project_id="linkhealth-care-2024",
-    collection_path="refund_sessions"
-)
-```
-
-## Production Deployment
-
-### Google Cloud Run
-
-```bash
-# Build container
-gcloud builds submit --tag gcr.io/linkhealth-care-2024/refund-agent
-
-# Deploy
-gcloud run deploy refund-agent \
-  --image gcr.io/linkhealth-care-2024/refund-agent \
-  --platform managed \
-  --region us-central1 \
-  --set-env-vars GOOGLE_CLOUD_PROJECT=linkhealth-care-2024
-```
-
-### Vertex AI Integration
-
-The agent can be deployed as a Vertex AI custom training job:
-
-```bash
-gcloud ai custom-jobs create \
-  --display-name refund-agent \
-  --python-image gcr.io/linkhealth-care-2024/refund-agent
-```
-
-## Troubleshooting
-
-### `ModuleNotFoundError: No module named google.adk`
-```bash
-pip install google-adk>=1.31.0
-```
-
-### `GOOGLE_APPLICATION_CREDENTIALS not found`
-```bash
-# Download service account key from GCP Console
-# https://console.cloud.google.com/iam-admin/serviceaccounts
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
-```
-
-### `Permission denied: Gemini API`
-```bash
-# Enable Gemini API in GCP Console
-gcloud services enable generativeaiapi.googleapis.com
-```
-
-## Development
-
-### Run Tests
-```bash
-pytest tests/ -v
-```
-
-### Add New Scenario
-1. Create folder: `data/scenario-{name}/`
-2. Add `details.json` with order data and expected outcome
-3. Run: `python run_refund.py scenario-{name}`
-
-### Extend Pipeline
-1. Create new agent in `refund_agent/agent.py`
-2. Add to `build_pipeline()` SequentialAgent list
-3. New agent can access previous stage outputs via `ctx.state`
-
-## Status
-
-- **v0.1.0** — Initial ADK implementation with 4 main stages and 7 test scenarios
-- **Next**: Firestore integration, Cloud Run deployment, multi-tenant support
-
----
-
-**Repository:** https://github.com/fmlin0429712024/customer-refund-agent  
-**GCP Project:** linkhealth-care-2024  
-**Model:** Gemini 2.5 Pro
+Edit the relevant `SKILL.md` — never `agent.py`. The pipeline reads the files
+at runtime, so policy changes take effect on the next run with no code change.

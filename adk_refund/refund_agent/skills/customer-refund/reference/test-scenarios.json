@@ -1,0 +1,93 @@
+{
+  "scenarios": [
+    {
+      "scenario_id": "auto-approve",
+      "order_id": "67890",
+      "input": {
+        "amount": 49.00,
+        "status": "delivered",
+        "days_since_delivery": 2
+      },
+      "expected_decision": "APPROVE",
+      "expected_reason": "AUTO_APPROVED",
+      "expected_priority": null,
+      "notes": "Within 5-day window, under $500 cap, no fraud flags."
+    },
+    {
+      "scenario_id": "escalate-past-window",
+      "order_id": "12345",
+      "input": {
+        "amount": 99.00,
+        "status": "delivered",
+        "days_since_delivery": 7
+      },
+      "expected_decision": "ESCALATE",
+      "expected_reason": "PAST_REFUND_WINDOW",
+      "expected_priority": "NORMAL",
+      "notes": "Exceeds 5-day window despite low amount."
+    },
+    {
+      "scenario_id": "escalate-in-transit",
+      "order_id": "11111",
+      "input": {
+        "amount": 29.00,
+        "status": "in_transit",
+        "days_since_delivery": null
+      },
+      "expected_decision": "ESCALATE",
+      "expected_reason": "IN_TRANSIT",
+      "expected_priority": "HIGH",
+      "notes": "Cannot refund before delivery completes."
+    },
+    {
+      "scenario_id": "reject-not-found",
+      "order_id": "99999",
+      "input": null,
+      "expected_decision": "REJECT",
+      "expected_reason": "ORDER_NOT_FOUND",
+      "expected_priority": null,
+      "notes": "Order ID does not exist in reference/orders.json."
+    },
+    {
+      "scenario_id": "escalate-high-value",
+      "order_id": "HIGH001",
+      "input": {
+        "amount": 750.00,
+        "status": "delivered",
+        "days_since_delivery": 2
+      },
+      "expected_decision": "ESCALATE",
+      "expected_reason": "HIGH_VALUE_ORDER",
+      "expected_priority": "HIGH",
+      "notes": "Not in orders.json by default — add as a synthetic case to test the $500 cap independent of the timeline rule."
+    },
+    {
+      "scenario_id": "fraud-duplicate-refund",
+      "order_id": "67890",
+      "input": {
+        "amount": 49.00,
+        "status": "delivered",
+        "days_since_delivery": 2,
+        "existing_open_ticket": "ESCA-20260701000000-EXAMPLE"
+      },
+      "expected_decision": "ESCALATE",
+      "expected_reason": "DUPLICATE_REFUND",
+      "expected_priority": "HIGH",
+      "notes": "Same order as auto-approve, but fraud-detection overrides the tentative APPROVE because an open ticket already exists."
+    },
+    {
+      "scenario_id": "fraud-frequency-abuse",
+      "order_id": "67890",
+      "input": {
+        "amount": 49.00,
+        "status": "delivered",
+        "days_since_delivery": 2,
+        "customer_refund_count_30d": 4
+      },
+      "expected_decision": "ESCALATE",
+      "expected_reason": "FRAUD_RISK",
+      "expected_priority": "HIGH",
+      "notes": "Customer exceeded 3 refunds in 30 days; fraud-detection overrides the tentative APPROVE."
+    }
+  ]
+}

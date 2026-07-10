@@ -1,0 +1,333 @@
+{
+  "eval_set_id": "refund_golden",
+  "name": "Refund golden set (cases 1-4)",
+  "description": null,
+  "eval_cases": [
+    {
+      "eval_id": "auto-approve",
+      "conversation": [
+        {
+          "invocation_id": "ea09dc7b-4e46-454a-80de-d4bb51bb8b8d",
+          "user_content": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "Process refund for order 67890",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null,
+                "tool_call": null,
+                "tool_response": null,
+                "part_metadata": null
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "Hello! I'm here to help with your refund request.\n\nGreat news! Your order qualifies for an immediate refund. You requested a refund for Order #67890 ($49.00) delivered 2 days ago. We'll process this to your original payment method within 1 business day. You'll receive a confirmation email shortly.\n\nIs there anything else I can help you with today?\n\nDECISION SUMMARY:\n- Final Decision: APPROVE\n- Reason: AUTO_APPROVED\n- Ticket: N/A",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null,
+                "tool_call": null,
+                "tool_response": null,
+                "part_metadata": null
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": "adk-d43551e2-ae87-4075-bd46-c0406f395b74",
+                "args": {
+                  "order_id": "67890"
+                },
+                "name": "lookup_order",
+                "partial_args": null,
+                "will_continue": null
+              },
+              {
+                "id": "adk-b704e291-e7e0-4904-8881-7cbc84776303",
+                "args": {
+                  "customer_id": "CUST002"
+                },
+                "name": "get_refund_history",
+                "partial_args": null,
+                "will_continue": null
+              }
+            ],
+            "tool_responses": [],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 0.0,
+          "rubrics": null,
+          "app_details": null
+        }
+      ],
+      "conversation_scenario": null,
+      "session_input": null,
+      "creation_timestamp": 0.0,
+      "rubrics": null,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "past-window",
+      "conversation": [
+        {
+          "invocation_id": "ea70ac2f-78f7-460c-8097-c0ae254662f8",
+          "user_content": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "Process refund for order 12345",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null,
+                "tool_call": null,
+                "tool_response": null,
+                "part_metadata": null
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "Based on the details of your case, I need to involve our specialist team who can provide more personalized support.\n\nCase Details:\n- Order: #12345\n- Amount: $99.00\n- Issue: Order delivered 7 days ago (outside standard 5-day window)\n- Ticket: ESCA-20260710071015-7A22B9\n- Priority: NORMAL\n- Expected Response: Within 4 hours\n\nYour case has been escalated. A member of our team will review your request and contact you with a decision.\n\nIs there anything else I can help you with today?\n\nDECISION SUMMARY:\n- Final Decision: ESCALATE\n- Reason: PAST_REFUND_WINDOW\n- Ticket: ESCA-20260710071015-7A22B9",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null,
+                "tool_call": null,
+                "tool_response": null,
+                "part_metadata": null
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": "adk-863f3190-ee30-4a15-a291-067861caab39",
+                "args": {
+                  "order_id": "12345"
+                },
+                "name": "lookup_order",
+                "partial_args": null,
+                "will_continue": null
+              },
+              {
+                "id": "adk-c8ed9eb2-29ed-4dcf-bcd3-43a5321f48e9",
+                "args": {
+                  "customer_id": "CUST001",
+                  "reason_code": "PAST_REFUND_WINDOW",
+                  "priority": "NORMAL",
+                  "order_id": "12345"
+                },
+                "name": "create_escalation_ticket",
+                "partial_args": null,
+                "will_continue": null
+              }
+            ],
+            "tool_responses": [],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 0.0,
+          "rubrics": null,
+          "app_details": null
+        }
+      ],
+      "conversation_scenario": null,
+      "session_input": null,
+      "creation_timestamp": 0.0,
+      "rubrics": null,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "in-transit",
+      "conversation": [
+        {
+          "invocation_id": "3b2c4989-660b-494c-bb50-984b042a27e8",
+          "user_content": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "Process refund for order 11111",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null,
+                "tool_call": null,
+                "tool_response": null,
+                "part_metadata": null
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "Based on the details of your case, I need to involve our specialist team who can provide more personalized support.\n\nCase Details:\n- Order: #11111\n- Amount: $29.00\n- Issue: Order is still being delivered.\n- Ticket: ESCA-20260710071028-E550BD\n- Priority: HIGH\n- Expected Response: Within 1 hour\n\nYour case has been escalated. A member of our team will review your request and contact you with a decision.\n\nIs there anything else I can help you with today?\n\nDECISION SUMMARY:\n- Final Decision: ESCALATE\n- Reason: IN_TRANSIT\n- Ticket: ESCA-20260710071028-E550BD",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null,
+                "tool_call": null,
+                "tool_response": null,
+                "part_metadata": null
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": "adk-67fb9544-ff83-446e-a5c1-a8650cd983c8",
+                "args": {
+                  "order_id": "11111"
+                },
+                "name": "lookup_order",
+                "partial_args": null,
+                "will_continue": null
+              },
+              {
+                "id": "adk-18d7d292-9c26-4a2c-a3e5-d02f3a7ffe31",
+                "args": {
+                  "reason_code": "IN_TRANSIT",
+                  "order_id": "11111",
+                  "customer_id": "CUST003",
+                  "priority": "HIGH"
+                },
+                "name": "create_escalation_ticket",
+                "partial_args": null,
+                "will_continue": null
+              }
+            ],
+            "tool_responses": [],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 0.0,
+          "rubrics": null,
+          "app_details": null
+        }
+      ],
+      "conversation_scenario": null,
+      "session_input": null,
+      "creation_timestamp": 0.0,
+      "rubrics": null,
+      "final_session_state": {}
+    },
+    {
+      "eval_id": "not-found",
+      "conversation": [
+        {
+          "invocation_id": "8a46d7a5-f05f-42e8-b761-847f3e730cf6",
+          "user_content": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "Process refund for order 99999",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null,
+                "tool_call": null,
+                "tool_response": null,
+                "part_metadata": null
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "media_resolution": null,
+                "code_execution_result": null,
+                "executable_code": null,
+                "file_data": null,
+                "function_call": null,
+                "function_response": null,
+                "inline_data": null,
+                "text": "Hello! I'm here to help with your refund request.\n\nI couldn't find an order with ID '99999' in our system. Could you please double-check the order number? It should be 5 digits starting with your purchase date.\n\nIs there anything else I can help you with today?\n\nDECISION SUMMARY:\n- Final Decision: REJECT\n- Reason: ORDER_NOT_FOUND\n- Ticket: N/A",
+                "thought": null,
+                "thought_signature": null,
+                "video_metadata": null,
+                "tool_call": null,
+                "tool_response": null,
+                "part_metadata": null
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": "adk-a2d6b939-56e6-4a5a-84a8-3043e4ef9d58",
+                "args": {
+                  "order_id": "99999"
+                },
+                "name": "lookup_order",
+                "partial_args": null,
+                "will_continue": null
+              }
+            ],
+            "tool_responses": [],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 0.0,
+          "rubrics": null,
+          "app_details": null
+        }
+      ],
+      "conversation_scenario": null,
+      "session_input": null,
+      "creation_timestamp": 0.0,
+      "rubrics": null,
+      "final_session_state": {}
+    }
+  ],
+  "creation_timestamp": 0.0
+}

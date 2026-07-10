@@ -1,96 +1,83 @@
-"""Customer Refund Agent Pipeline — Google ADK Implementation (Self-Contained)."""
+"""Customer Refund Agent — Google ADK (textbook layout).
 
-import os
+A `SequentialAgent` pipeline of four sub-agents. The split is deliberate:
+
+  * Business logic (5-day window, $500 cap, escalation rules) lives in the
+    verbatim `SKILL.md` files that Claude Code produced, bundled under
+    `skills/customer-refund/` — byte-for-byte identical to
+    `.claude/skills/customer-refund/`. To change policy, edit the SKILL.md.
+
+  * Deterministic data access (order lookup, refund history, ticket creation)
+    lives in `tools.py` as ADK FunctionTools backed by SQLite. The LLM calls
+    these instead of guessing.
+
+Run the playground from the parent folder (`adk_refund/`):
+
+    adk web
+
+then pick `refund_agent` and type e.g. "Process refund for order 67890".
+"""
+
+from pathlib import Path
+
 from google.adk.agents import Agent, SequentialAgent
-from refund_agent.skills import (
-    REFUND_POLICY,
-    REFUND_DECISION_LOGIC,
-    FRAUD_DETECTION_LOGIC,
-    COMMUNICATION_TEMPLATES,
-)
+
+from .tools import lookup_order, get_refund_history, create_escalation_ticket
 
 MODEL = "gemini-2.5-flash"
 
+# Self-contained, bundled copy of the Claude-Code skill tree.
+SKILLS_DIR = Path(__file__).parent / "skills" / "customer-refund"
+
+
+def load_skill(relpath: str) -> str:
+    """Return the verbatim text of a bundled SKILL.md (no transformation)."""
+    return (SKILLS_DIR / relpath).read_text(encoding="utf-8")
+
 
 # ---------------------------------------------------------------------------
-# Stage 1: Order Lookup — Verify & Extract
+# Stage 1: Order Lookup — verify & extract (tool: lookup_order)
 # ---------------------------------------------------------------------------
 
 def _build_order_lookup_agent() -> Agent:
-    """Order lookup agent — verify order exists and extract details."""
-
-    def get_instruction(ctx):
-        order_id = ctx.state.get("order_id", "67890")
-        reference_orders = ctx.state.get("reference_orders", "{}")
-        return f"""You are the order verification step of the refund pipeline.
-
-Your job is to confirm an order exists and extract the fields needed for eligibility evaluation.
-
-Reference data (all orders in system):
-{reference_orders}
+    skill = load_skill("order-lookup/SKILL.md")
+    instruction = f"""{skill}
 
 ---
-## Order to Look Up
+## How to look up the order in this system
 
-Order ID: {order_id}
+Call the `lookup_order` tool with the order ID the customer states in their
+message. The tool returns the order record and the computed
+`days_since_delivery` — do NOT compute dates yourself and do NOT invent data.
+If the tool returns found=False, report ORDER_NOT_FOUND.
 
----
-## Your Task
-
-1. Search the reference data for this order ID.
-2. If found, extract these fields:
-   - order_id
-   - customer_id
-   - amount
-   - status (delivered | in_transit)
-   - delivery_date (or null if not yet delivered)
-   - product
-
-3. If status == "delivered", calculate:
-   days_since_delivery = today (2026-07-09) − delivery_date
-
-4. Output format:
-
-=== ORDER LOOKUP RESULT ===
-Order ID:              [order_id]
-Found:                 YES | NO
-Customer ID:           [customer_id or N/A]
-Status:                [delivered | in_transit | not_found]
-Amount:                $[amount]
-Delivery Date:         [date or "N/A — in transit"]
-Days Since Delivery:   [N or "N/A"]
-Product:               [product]
-
-NEXT STEP: refund-policy evaluation
-
----
-
-Do NOT guess or infer missing fields. Report exactly what's in the reference data.
+Then output the ORDER LOOKUP RESULT block exactly as the SKILL.md specifies.
 """
-
     return Agent(
         model=MODEL,
         name="order_lookup",
         description="Verifies order exists and extracts status, amount, delivery date.",
-        instruction=get_instruction,
+        instruction=instruction,
+        tools=[lookup_order],
         output_key="order_lookup_output",
     )
 
 
 # ---------------------------------------------------------------------------
-# Stage 2: Refund Decision — Apply Rules
+# Stage 2: Refund Decision — apply rules (pure policy, no tools)
 # ---------------------------------------------------------------------------
 
 def _build_refund_decision_agent() -> Agent:
-    """Refund decision agent — apply eligibility rules."""
+    policy_skill = load_skill("refund-policy/SKILL.md")
+    decision_skill = load_skill("refund-decision/SKILL.md")
 
     def get_instruction(ctx):
         order_data = ctx.state.get("order_lookup_output", "")
-        return f"""{REFUND_POLICY}
+        return f"""{policy_skill}
 
 ---
 
-{REFUND_DECISION_LOGIC}
+{decision_skill}
 
 ---
 ## Order Data from Lookup
@@ -100,9 +87,7 @@ def _build_refund_decision_agent() -> Agent:
 ---
 ## Your Task
 
-Apply the decision tree to this order and output the REFUND DECISION section.
-
-Include:
+Apply the decision tree from the SKILL.md above and output the REFUND DECISION:
 - Decision: APPROVE | ESCALATE | REJECT
 - Reason Code: [specific reason]
 - Priority: HIGH | NORMAL | N/A
@@ -120,17 +105,16 @@ Include:
 
 
 # ---------------------------------------------------------------------------
-# Stage 3: Fraud Detection — Screen for Abuse
+# Stage 3: Fraud Detection — screen for abuse (tool: get_refund_history)
 # ---------------------------------------------------------------------------
 
 def _build_fraud_detection_agent() -> Agent:
-    """Fraud detection agent — screen for duplicate/frequency abuse."""
+    skill = load_skill("fraud-detection/SKILL.md")
 
     def get_instruction(ctx):
         order_data = ctx.state.get("order_lookup_output", "")
         decision_data = ctx.state.get("refund_decision_output", "")
-        fraud_flags = ctx.state.get("fraud_flags", "")
-        return f"""{FRAUD_DETECTION_LOGIC}
+        return f"""{skill}
 
 ---
 ## Order Data
@@ -141,28 +125,20 @@ def _build_fraud_detection_agent() -> Agent:
 
 {decision_data}
 
-## Fraud Signals Provided
-
-{fraud_flags if fraud_flags else "(None reported)"}
-
 ---
 ## Your Task
 
-Screen this refund for abuse patterns:
-
-1. If decision is APPROVE (tentative):
-   - Check if duplicate_refund_on_order (fraud signal present)
-   - Check if customer_refund_count_30d > 3 (fraud signal present)
-   - Override to ESCALATE if either check triggers
-
-2. If decision is already ESCALATE or REJECT:
-   - Fraud detection doesn't override
-   - Pass through unchanged
+Screen this refund using the SKILL.md logic above.
+- If the decision is a tentative APPROVE: call `get_refund_history` with the
+  customer_id from the order data. If refund_count_30d > 3, override to
+  ESCALATE (FRAUD_RISK). Otherwise both checks PASS.
+- If the decision is already ESCALATE or REJECT: pass it through unchanged
+  (no tool call needed).
 
 Output format:
 
 === FRAUD SCREEN RESULT ===
-Order ID:          [order_id]
+Order ID:           [order_id]
 Tentative Decision: [decision from above]
 Duplicate Check:    PASS | FAIL (reason if fail)
 Frequency Check:    PASS | FAIL (reason if fail)
@@ -176,28 +152,23 @@ NEXT STEP: customer-communication
         name="fraud_detection",
         description="Screens tentatively-approved refunds for abuse patterns.",
         instruction=get_instruction,
+        tools=[get_refund_history],
         output_key="fraud_detection_output",
     )
 
 
 # ---------------------------------------------------------------------------
-# Stage 4: Customer Communication — Craft Response
+# Stage 4: Customer Communication — craft response (tool: create_escalation_ticket)
 # ---------------------------------------------------------------------------
 
 def _build_communication_agent() -> Agent:
-    """Customer communication agent — craft the customer-facing message."""
+    skill = load_skill("customer-communication/SKILL.md")
 
     def get_instruction(ctx):
         order_data = ctx.state.get("order_lookup_output", "")
         decision_data = ctx.state.get("refund_decision_output", "")
         fraud_data = ctx.state.get("fraud_detection_output", "")
-        return f"""You are the final step of the refund pipeline — the customer-facing communicator.
-
-Your job is to craft an appropriate response based on the decision.
-
-## Reference Response Templates
-
-{str(COMMUNICATION_TEMPLATES)}
+        return f"""{skill}
 
 ---
 ## Full Pipeline Results
@@ -214,25 +185,19 @@ Your job is to craft an appropriate response based on the decision.
 ---
 ## Your Task
 
-1. Extract the final decision and reason code from fraud_data (or decision_data if no fraud check)
-2. Choose the appropriate template from COMMUNICATION_TEMPLATES
-3. Fill in placeholders: order_id, amount, days, ticket_id, etc.
-4. Output the complete customer-facing message ready to send
+1. Determine the final decision and reason code from the fraud check (or the
+   refund decision if no fraud check applied).
+2. If the final decision is ESCALATE: call `create_escalation_ticket` with the
+   order_id, customer_id, reason_code, and priority to obtain a REAL ticket ID
+   and SLA. Use those exact values — never invent a ticket number.
+3. Follow the SKILL.md tone-by-outcome and dialogue guidance to write the
+   customer-facing message, filling in order_id, amount, days, ticket_id, etc.
+4. End with a short DECISION SUMMARY:
+   - Final Decision: APPROVE | ESCALATE | REJECT
+   - Reason: [reason code]
+   - Ticket: [ticket_id if escalated, or N/A]
 
-Be warm, clear, and transparent. Never invent policy. Use the templates exactly.
-
----
-## Output Format
-
-=== CUSTOMER RESPONSE ===
-
-[Full customer-facing message here, using the template]
-
----
-DECISION SUMMARY:
-- Final Decision: APPROVE | ESCALATE | REJECT
-- Reason: [reason code]
-- Ticket: [ticket_id if escalated, or N/A]
+Be warm, clear, and transparent. Never invent policy.
 """
 
     return Agent(
@@ -240,23 +205,22 @@ DECISION SUMMARY:
         name="customer_communication",
         description="Crafts customer-facing messages for all outcomes.",
         instruction=get_instruction,
+        tools=[create_escalation_ticket],
         output_key="customer_response",
     )
 
 
 # ---------------------------------------------------------------------------
-# Main Pipeline
+# Root agent — the only element ADK requires in this module.
 # ---------------------------------------------------------------------------
 
-def build_pipeline(run_name: str = "refund-demo-01") -> SequentialAgent:
-    """Build the full refund processing pipeline."""
-    return SequentialAgent(
-        name="refund_pipeline",
-        description="End-to-end customer refund processing pipeline.",
-        sub_agents=[
-            _build_order_lookup_agent(),
-            _build_refund_decision_agent(),
-            _build_fraud_detection_agent(),
-            _build_communication_agent(),
-        ],
-    )
+root_agent = SequentialAgent(
+    name="refund_pipeline",
+    description="End-to-end customer refund processing pipeline.",
+    sub_agents=[
+        _build_order_lookup_agent(),
+        _build_refund_decision_agent(),
+        _build_fraud_detection_agent(),
+        _build_communication_agent(),
+    ],
+)
