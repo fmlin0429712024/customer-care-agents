@@ -24,7 +24,7 @@ where possible (assistant-driven); portal only for viewing / enterprise setup.
 | — | Governance — PII guardrail | ADK Plugin, redaction (local) | ✅ done |
 | 2 | **Deploy to Cloud Run** (single region `us-central1`) | container + service account + secrets | ✅ **done** 🎉 [live](https://refund-agent-xwbl4hgnja-uc.a.run.app) |
 | 2.5 | Data layer: SQLite → Firestore | swap `tools.py` internals, agent unchanged | ✅ **done** |
-| 3 | Deploy to Agent Engine (managed agent tier) | `adk deploy agent_engine` (Vertex backend) | ⬜ |
+| 3 | **Deploy to Agent Engine** (managed agent tier) | `adk deploy agent_engine` (Vertex backend) | ✅ **done** 🎉 |
 | 4 | **Evaluation** | `adk eval` — golden set, offline regression gate | ✅ **done** (4/4 pass) |
 | 5 | Managed Sessions / Memory | swap InMemory for platform-managed state | ⬜ |
 | 6 | Governance (managed) | Model Armor / enterprise IAM / quotas (portal) | ⬜ |
@@ -41,6 +41,7 @@ Tiers: **local → Cloud Run** (managed infra + scaling) **→ Agent Engine** (m
 | 03 | [Deployment: Cloud Run](docs/03-cloud-run-deployment.md) ✅ | single-region deploy, container vs runtime config, service account |
 | 03.5 | [Data layer: SQLite → Firestore](docs/03.5-firestore-data-layer.md) ✅ | swap storage, touch one file; persistent + cross-instance |
 | 04 | [Evaluation: adk eval](docs/04-evaluation-adk-eval.md) ✅ | offline regression gate; thresholds absorb LLM non-determinism |
+| 05 | [Deployment: Agent Engine](docs/05-agent-engine-deployment.md) ✅ | managed agent tier; Vertex/OAuth auth (not API keys); managed Sessions; entry point for Agentspace |
 
 > **Eval in one line:** `adk eval` is essentially **regression testing for CI/CD** —
 > run the whole golden set before every deploy; all-pass = safe to ship. It's an

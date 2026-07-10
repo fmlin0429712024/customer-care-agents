@@ -43,16 +43,34 @@ _PRIORITY_SLA = {
     "NORMAL": "4 hour response / 24 hour resolution",
 }
 
-# One client per process; uses ADC locally, the service account on Cloud Run.
-_db = firestore.Client(project=os.environ.get("GOOGLE_CLOUD_PROJECT"))
+# One client per process; uses ADC locally, the service account on Cloud Run /
+# Agent Engine. Firestore is picky: it wants the project *ID*, not the number.
+# On Agent Engine, GOOGLE_CLOUD_PROJECT resolves to the project *number*
+# (platform-set / metadata auto-detect), which Firestore rejects with
+# "Invalid project id in name!" → 404. So prefer an explicit, platform-neutral
+# var we control (REFUND_FIRESTORE_PROJECT) and fall back to GOOGLE_CLOUD_PROJECT
+# for local runs where it holds the ID.
+_FIRESTORE_PROJECT = (
+    os.environ.get("REFUND_FIRESTORE_PROJECT")
+    or os.environ.get("GOOGLE_CLOUD_PROJECT")
+)
+_db = firestore.Client(project=_FIRESTORE_PROJECT)
 
 
 def _seed_orders() -> None:
-    """Seed the orders collection from the bundled JSON if it is empty."""
-    coll = _db.collection(ORDERS_COLL)
-    if next(iter(coll.limit(1).stream()), None) is None:
-        for o in _SEED.get("orders", []):
-            coll.document(o["order_id"]).set(o)
+    """Seed the orders collection from the bundled JSON if it is empty.
+
+    Best-effort: a Firestore hiccup at import time must not brick agent loading
+    (the orders are normally already seeded). Real read/write errors will surface
+    later at tool-call time where they can be reported cleanly.
+    """
+    try:
+        coll = _db.collection(ORDERS_COLL)
+        if next(iter(coll.limit(1).stream()), None) is None:
+            for o in _SEED.get("orders", []):
+                coll.document(o["order_id"]).set(o)
+    except Exception as exc:  # noqa: BLE001 — deliberately non-fatal at import
+        print(f"[tools] order seeding skipped (non-fatal): {exc}")
 
 
 _seed_orders()
