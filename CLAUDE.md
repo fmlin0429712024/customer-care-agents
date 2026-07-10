@@ -1,5 +1,16 @@
 # Customer Service Agents — Workspace
 
+> **▶ Handoff — resume here (for a fresh session):**
+> This folder was renamed from `customer-refund-agent` → `customer-care-agents`;
+> the Claude Code memory was migrated along with it, so recall should still work
+> (if not, read `MEMORY.md`). **Where we are:** the `refund-agent` worker is
+> **done and deployed to Agent Engine**; the workspace was just restructured into
+> a worker + coordinator system. **Next action:** start **M1 — LLM-routed
+> orchestration (concept only)** for the `customer-care-agent` coordinator.
+> **How to teach me (the user):** concept-first, big-picture-first, one step at a
+> time, repetition welcome; explain the concept, let me say it back in my own
+> words, *then* go hands-on. See [[user-learning-style]].
+
 An **agent system**, not a single agent. Two agents developed side by side:
 
 ```
