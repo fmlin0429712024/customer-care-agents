@@ -48,9 +48,9 @@ gcp-*.json
 google-credentials.json
 service-account-key.json
 
-# ADK outputs
-adk_refund/output/
-adk_refund/.gcloud/
+# ADK outputs (recursive — works after the reorg into refund-agent/)
+**/output/
+**/.gcloud/
 
 # Test/runtime files
 *.log
