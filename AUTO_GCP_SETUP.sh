@@ -70,9 +70,9 @@ echo "✓ Project set to: $CONFIGURED_PROJECT"
 # ============================================================================
 echo ""
 echo "[4/8] Enabling required APIs..."
-echo "  Enabling generativeaiapi..."
-gcloud services enable generativeaiapi.googleapis.com
-echo "  Enabling aiplatform..."
+echo "  Enabling generativelanguage (Gemini API)..."
+gcloud services enable generativelanguage.googleapis.com
+echo "  Enabling aiplatform (Vertex AI)..."
 gcloud services enable aiplatform.googleapis.com
 echo "✓ APIs enabled"
 

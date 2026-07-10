@@ -34,9 +34,8 @@ gcloud config list | grep "project ="
 
 # Step 3: Enable APIs
 echo -e "\n[Step 3] Enabling required APIs..."
-gcloud services enable generativeaiapi.googleapis.com
+gcloud services enable generativelanguage.googleapis.com
 gcloud services enable aiplatform.googleapis.com
-gcloud services enable cloudruntime.googleapis.com
 echo "✓ APIs enabled"
 
 # Step 4: Create service account
