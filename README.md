@@ -103,6 +103,7 @@ Each milestone gets one page.
 | # | Doc | Covers |
 |---|-----|--------|
 | 01 | [Coordinator design & handoff contract](customer-care-agent/docs/01-coordinator-design.md) | LLM routing, the handoff contract, and how it becomes A2A |
+| 02 | [Conversation eval](customer-care-agent/docs/02-conversation-eval.md) | trajectory eval, deterministic checks + LLM-as-judge, rubric, runnable |
 
 **Worker** — [`refund-agent/adk_refund/docs/`](refund-agent/adk_refund/docs/) (built series)
 
