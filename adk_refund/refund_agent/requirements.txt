@@ -1,2 +1,8 @@
+# Pinned so the Agent Engine build gets recent-enough deps. The console
+# Dashboard + the Identity / Topology / Security tabs stay LOCKED unless the
+# deployed runtime has google-cloud-aiplatform >= 1.126.1 and google-adk >=
+# 1.18.0. aiplatform is otherwise pulled in transitively at an older version,
+# so we pin it explicitly.
 google-adk>=1.31.0
+google-cloud-aiplatform>=1.126.1
 google-cloud-firestore>=2.0.0
