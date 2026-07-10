@@ -1,5 +1,6 @@
 """Customer Refund Agent Pipeline — Google ADK Implementation (Self-Contained)."""
 
+import os
 from google.adk.agents import Agent, SequentialAgent
 from refund_agent.skills import (
     REFUND_POLICY,
@@ -8,7 +9,7 @@ from refund_agent.skills import (
     COMMUNICATION_TEMPLATES,
 )
 
-MODEL = "gemini-2.5-pro"
+MODEL = "gemini-2.5-flash"
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +70,7 @@ Do NOT guess or infer missing fields. Report exactly what's in the reference dat
 
     return Agent(
         model=MODEL,
-        name="order-lookup",
+        name="order_lookup",
         description="Verifies order exists and extracts status, amount, delivery date.",
         instruction=get_instruction,
         output_key="order_lookup_output",
@@ -111,7 +112,7 @@ Include:
 
     return Agent(
         model=MODEL,
-        name="refund-decision",
+        name="refund_decision",
         description="Applies refund policy rules to order data.",
         instruction=get_instruction,
         output_key="refund_decision_output",
@@ -172,7 +173,7 @@ NEXT STEP: customer-communication
 
     return Agent(
         model=MODEL,
-        name="fraud-detection",
+        name="fraud_detection",
         description="Screens tentatively-approved refunds for abuse patterns.",
         instruction=get_instruction,
         output_key="fraud_detection_output",
@@ -236,7 +237,7 @@ DECISION SUMMARY:
 
     return Agent(
         model=MODEL,
-        name="customer-communication",
+        name="customer_communication",
         description="Crafts customer-facing messages for all outcomes.",
         instruction=get_instruction,
         output_key="customer_response",
@@ -250,9 +251,9 @@ DECISION SUMMARY:
 def build_pipeline(run_name: str = "refund-demo-01") -> SequentialAgent:
     """Build the full refund processing pipeline."""
     return SequentialAgent(
-        name="refund-pipeline",
+        name="refund_pipeline",
         description="End-to-end customer refund processing pipeline.",
-        agents=[
+        sub_agents=[
             _build_order_lookup_agent(),
             _build_refund_decision_agent(),
             _build_fraud_detection_agent(),

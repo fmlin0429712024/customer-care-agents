@@ -12,10 +12,18 @@ Examples:
 import asyncio
 import sys
 import json
+import os
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Ensure API key is in environment
+api_key = os.getenv("GENAI_API_KEY")
+if not api_key:
+    print("ERROR: GENAI_API_KEY not set in .env")
+    sys.exit(1)
+os.environ["GENAI_API_KEY"] = api_key
 
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService

@@ -60,7 +60,7 @@ except Exception as e:
 # Test 4: Test model availability
 print("\n[4] Model Availability")
 try:
-    model = "gemini-2.5-pro"
+    model = "gemini-2.5-flash"
     # Try a simple completion
     response = client.models.generate_content(
         model=model,
