@@ -1,0 +1,12 @@
+{
+  "scenario_id": "scenario-2-past-window",
+  "title": "Escalate: Past Refund Window",
+  "order_id": "12345",
+  "amount": 99.00,
+  "status": "delivered",
+  "days_since_delivery": 7,
+  "fraud_flags": "",
+  "expected_decision": "ESCALATE",
+  "expected_reason": "PAST_REFUND_WINDOW",
+  "description": "Order delivered 7 days ago, exceeds 5-day refund window. Should escalate."
+}

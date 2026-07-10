@@ -1,0 +1,12 @@
+{
+  "scenario_id": "scenario-6-duplicate",
+  "title": "Escalate: Duplicate Refund Detected",
+  "order_id": "67890",
+  "amount": 49.00,
+  "status": "delivered",
+  "days_since_delivery": 2,
+  "fraud_flags": "existing_open_ticket: ESCA-20260701000000-EXAMPLE",
+  "expected_decision": "ESCALATE",
+  "expected_reason": "DUPLICATE_REFUND",
+  "description": "Same order as scenario 1, but already has an open refund ticket. Fraud detection should override APPROVE."
+}

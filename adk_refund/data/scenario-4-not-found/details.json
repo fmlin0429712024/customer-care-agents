@@ -1,0 +1,12 @@
+{
+  "scenario_id": "scenario-4-not-found",
+  "title": "Reject: Order Not Found",
+  "order_id": "99999",
+  "amount": null,
+  "status": "not_found",
+  "days_since_delivery": null,
+  "fraud_flags": "",
+  "expected_decision": "REJECT",
+  "expected_reason": "ORDER_NOT_FOUND",
+  "description": "Order ID does not exist in system. Should reject."
+}
