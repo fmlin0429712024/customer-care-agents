@@ -59,6 +59,7 @@ front door that dispatches to registered specialist agents.
 | **Observability — tracing** | worker (OTel → Cloud Trace + LangSmith) | mechanism | ✅ done |
 | **Governance — PII guardrail** | worker (ADK Plugin) | mechanism | ✅ done |
 | **Evaluation — regression gate** | worker (`adk eval`, golden set) | mechanism | ✅ done |
+| **Evaluation — LLM-as-judge (conversation)** | coordinator (`care-evaluator` agent) | behavior → mechanism | 🟡 M1 built |
 | **Deployment tiers** | worker (local → Cloud Run → Agent Engine) | mechanism | ✅ done |
 | **Register to Gemini Enterprise** | both | mechanism | ⬜ M6 |
 
@@ -128,7 +129,9 @@ customer-care-agents/
 │   ├── README.md
 │   ├── TESTING.md                    ← conversation (trajectory) test cheat sheet
 │   ├── docs/                         ← design & milestone docs
-│   └── .claude/skills/customer-care/ ← coordinator skill + conversation scenarios
+│   └── .claude/skills/
+│       ├── customer-care/            ← coordinator skill + conversation scenarios
+│       └── care-evaluator/           ← LLM-as-judge eval agent (grades the coordinator)
 └── refund-agent/                     ← WORKER (done, deployed)
     ├── adk_refund/                   ← the ADK agent + docs series
     └── .claude/skills/customer-refund/
