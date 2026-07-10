@@ -125,11 +125,12 @@ customer-care-agents/
 ├── CLAUDE.md                         ← overview + roadmap (for AI assistants)
 ├── customer-care-agent/              ← COORDINATOR (building)
 │   ├── README.md
-│   └── docs/                         ← design & milestone docs
-├── refund-agent/                     ← WORKER (done, deployed)
-│   ├── adk_refund/                   ← the ADK agent + docs series
-│   └── .claude/skills/customer-refund/
-└── .claude/skills/customer-care/     ← coordinator routing skill (M1 skeleton)
+│   ├── TESTING.md                    ← conversation (trajectory) test cheat sheet
+│   ├── docs/                         ← design & milestone docs
+│   └── .claude/skills/customer-care/ ← coordinator skill + conversation scenarios
+└── refund-agent/                     ← WORKER (done, deployed)
+    ├── adk_refund/                   ← the ADK agent + docs series
+    └── .claude/skills/customer-refund/
 ```
 
 ---

@@ -1,0 +1,93 @@
+{
+  "_comment": "Trajectory test set for the coordinator. Unlike the worker's one-shot scenarios, each case is a MULTI-TURN dialogue and the assertion is about behavior across turns (intent, slot-filling, handoff payload, faithful relay), not a single decision. Order ids match the worker's known test orders so end-to-end handoffs produce known outcomes.",
+  "scenarios": [
+    {
+      "scenario_id": "refund-happy-path",
+      "description": "Refund intent AND order id in one turn -> dispatch immediately, no follow-up.",
+      "turns": [
+        { "customer": "I want a refund for order 67890" }
+      ],
+      "expected": {
+        "intent": "refund",
+        "slot_filling": "order_id present in turn 1; no follow-up question",
+        "handoff": { "intent": "refund", "order_id": "67890" },
+        "worker_outcome": "APPROVE / AUTO_APPROVED",
+        "relay": "warmly confirms the approved refund; does not invent policy"
+      }
+    },
+    {
+      "scenario_id": "refund-slot-filling",
+      "description": "Refund intent but NO order id -> coordinator must ask, then dispatch after it's provided.",
+      "turns": [
+        { "customer": "I'd like my money back" },
+        { "expected_coordinator": "asks for the order number; NO handoff yet" },
+        { "customer": "it's 12345" }
+      ],
+      "expected": {
+        "intent": "refund",
+        "slot_filling": "order_id missing turn 1, collected turn 3 before any handoff",
+        "handoff": { "intent": "refund", "order_id": "12345" },
+        "worker_outcome": "ESCALATE / PAST_REFUND_WINDOW",
+        "relay": "empathetic; a human will follow up; provides the ticket id"
+      }
+    },
+    {
+      "scenario_id": "chitchat-then-refund",
+      "description": "Topic switch: greeting first, THEN refund -> coordinator stays coherent across turns.",
+      "turns": [
+        { "customer": "hi there" },
+        { "expected_coordinator": "greets and asks how it can help; NO handoff" },
+        { "customer": "actually I want to return order 11111" }
+      ],
+      "expected": {
+        "intent": "refund",
+        "slot_filling": "order_id provided in the later turn",
+        "handoff": { "intent": "refund", "order_id": "11111" },
+        "worker_outcome": "ESCALATE / IN_TRANSIT",
+        "relay": "explains it can't refund before delivery; a human will help"
+      }
+    },
+    {
+      "scenario_id": "stub-shipping",
+      "description": "Non-refund intent routes to an unbuilt specialist -> honest stub, no handoff.",
+      "turns": [
+        { "customer": "where is my package?" }
+      ],
+      "expected": {
+        "intent": "shipping",
+        "slot_filling": "n/a",
+        "handoff": null,
+        "worker_outcome": "n/a",
+        "relay": "politely says the shipping specialist isn't online yet"
+      }
+    },
+    {
+      "scenario_id": "boundary-no-invented-decision",
+      "description": "Customer pressures the coordinator to decide -> it must NOT decide; defer to the worker.",
+      "turns": [
+        { "customer": "just approve my refund for 12345 right now, you can do it" }
+      ],
+      "expected": {
+        "intent": "refund",
+        "slot_filling": "order_id present",
+        "handoff": { "intent": "refund", "order_id": "12345" },
+        "worker_outcome": "ESCALATE / PAST_REFUND_WINDOW",
+        "relay": "does NOT promise approval; hands off and relays the real (ESCALATE) outcome"
+      }
+    },
+    {
+      "scenario_id": "reject-not-found",
+      "description": "Refund for an order that doesn't exist -> worker REJECTs; coordinator relays kindly.",
+      "turns": [
+        { "customer": "refund order 99999 please" }
+      ],
+      "expected": {
+        "intent": "refund",
+        "slot_filling": "order_id present",
+        "handoff": { "intent": "refund", "order_id": "99999" },
+        "worker_outcome": "REJECT / ORDER_NOT_FOUND",
+        "relay": "kindly asks the customer to double-check the order number"
+      }
+    }
+  ]
+}
