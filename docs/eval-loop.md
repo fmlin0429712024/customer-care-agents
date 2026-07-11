@@ -57,6 +57,11 @@ shapes — a crisp label and free-form prose:
 | **c6** | refund | **golden set** (exact match) | `decision` ≠ the policy's right answer |
 | **c7** | refund | **LLM-as-judge** | `decision` is **correct**, but the reply promises an approval that never happened |
 
+*(c5 also shows FAIL on the outcome axis — a realistic **cascade**: because care
+never delegated, the worker was never invoked, so no decision exists to score.
+Its **primary** signal is the trajectory axis; a coordinator miss starves the
+worker downstream.)*
+
 The load-bearing distinction (and the most common interview trap):
 
 > **Exact-match against a golden set is *not* LLM-as-judge — it's an assertion.**
