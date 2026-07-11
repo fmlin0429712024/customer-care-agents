@@ -51,6 +51,7 @@ service-account-key.json
 # ADK outputs (recursive — works after the reorg into refund-agent/)
 **/output/
 **/.gcloud/
+**/.adk/          # local session.db + runtime state (per-agent, regenerated on run)
 
 # Test/runtime files
 *.log
