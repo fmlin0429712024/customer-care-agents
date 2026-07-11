@@ -6,3 +6,7 @@
 google-adk>=1.31.0
 google-cloud-aiplatform>=1.126.1
 google-cloud-firestore>=2.0.0
+# Required for --otel_to_cloud: ADK's GCP telemetry setup imports the OTLP/HTTP
+# span exporter at startup; without these the managed runtime fails to start.
+opentelemetry-exporter-otlp-proto-http>=1.42.1
+opentelemetry-exporter-gcp-trace>=1.12.0
