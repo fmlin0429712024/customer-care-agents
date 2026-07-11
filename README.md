@@ -99,62 +99,40 @@ which is exactly what makes the coordinator differ from the worker:
 > worker is short and stateless. That asymmetry *is* the coordinator-vs-worker
 > thesis, made concrete at the deployment layer.
 
-The same harness is implemented **two ways** — the core of this repo, both
-**deployed & verified**:
+That same harness — same policy — is then built **two ways**. This side-by-side
+**is the core of this repo**; both are **deployed & verified**. The two pages are
+the deep dive — **start here:**
 
-| Way | Substrate | Who provides the harness | Status | Doc |
-|-----|-----------|--------------------------|--------|-----|
-| **1 · Application-level** | Cloud Run (bare compute) | **you build it** in the app | ✅ 2 services, real A2A/HTTPS | [Cloud Run](docs/harness-cloud-run.md) |
-| **2 · Platform-managed** | Vertex Agent Engine | **the platform provides it** | ✅ `stream_query` verified | [Agent Engine](docs/harness-agent-platform.md) |
+| | ① [**Application-level · Cloud Run**](docs/harness-cloud-run.md) | ② [**Platform-managed · Agent Engine**](docs/harness-agent-platform.md) |
+|---|---|---|
+| Who provides the harness | **you build it** in the app | **the platform provides it** |
+| Container · serve · tracing | you write them (`Dockerfile`, `serve.py`, OTel) | `adk deploy` generates them; tracing is a flag |
+| The trade-off | runs **anywhere** (portable) | **org-wide** enforcement (platform-only) |
+| Status | ✅ 2 services, real A2A / HTTPS | ✅ `stream_query` verified |
 
-**Same worker, two ways — who does the work:**
-
-| Concern | Way 1 · application-level | Way 2 · platform-managed |
-|---------|--------------------------|--------------------------|
-| **Container** | you write the `Dockerfile` | `adk deploy` generates it |
-| **Serve entry** | you write `serve.py` / `a2a_server.py` | platform runtime |
-| **Sessions** | you wire a `SessionService` | managed (automatic) |
-| **Tracing** | you set up the OTel exporter | a flag (`--otel_to_cloud`) |
-| **Guardrail (PII)** | a plugin on your Runner | a platform **Policy** (org tier) |
-| **Portability** | runs anywhere (localhost, any cloud) | only on the platform |
-
-**Are there platform-only features?** For **single-agent** harness (sessions,
-trace, guardrail, memory) the answer is *no* — the application can do everything
-the platform does, just with more manual wiring (Way 1 is the more fundamental
-layer). The platform's genuine exclusives are all **cross-agent / org-scale**:
-agent **registry & discovery**, **org-wide non-bypassable governance** (SGP),
-**multi-tenant identity**, and **cross-agent audit** — things a single app
-cannot provide *for other agents*.
+**The punchline worth the click:** for a **single agent**, the app can do
+*everything* the platform does — Way 1 is the more fundamental layer. The
+platform's true exclusives are all **cross-agent / org-scale** (registry &
+discovery, org-wide non-bypassable governance, multi-tenant identity, cross-agent
+audit) — things one app cannot provide *for other agents*.
 
 ## 4 · How it's tested — *the evaluation loop*
 
-A fourth interview question: *how do you know it's correct?* The
-[**evaluation loop**](docs/eval-loop.md) is a **localhost QA gate** — in front of
-deploy, never itself deployed. It audits the system **end-to-end** and localizes
-**which agent** failed, on **two axes** matching the two archetypes:
+A fourth interview question: *how do you know it's correct?* The [**evaluation
+loop**](docs/eval-loop.md) is a **localhost QA gate** — end-to-end across both
+agents, pinpointing **which agent** failed on **two axes**: **trajectory** (care —
+did it route without self-deciding?) and **outcome** (refund — the right decision
+*and* an honest reply?).
 
-- **Trajectory** (care): did it route / slot-fill / **not self-decide**?
-- **Outcome** (refund): is the decision right **and** does the reply agree?
+The one idea worth the click: **a golden-set match is an assertion, not a judge.**
+An **LLM-as-judge** earns its place only where no golden string can reach — a reply
+that hallucinates an approval the customer never got. The suite proves it
+concretely: a case flips **PASS → FAIL** only once the real model is switched on.
 
-8 synthetic cases (input + golden) plant failures caught by **four different
-mechanisms** — the core lesson:
+And the loop has **two jobs**: a pre-deploy **regression gate** and a post-deploy
+**data flywheel** (real traffic → human-in-the-loop → new golden → better agents).
 
-| Case | Agent | Caught by |
-|------|-------|-----------|
-| c5 | care | **trajectory** (self-decided instead of delegating) |
-| c6 | refund | **golden set** (decision ≠ right answer) |
-| c7 | refund | reply check — **blunt** hallucination ("approved") |
-| c8 | refund | reply check — **subtle** hallucination: offline proxy **misses** it, only the live **LLM-judge** catches it (verified) |
-
-> **The distinction that matters:** exact-match against a golden set is an
-> *assertion*, **not** LLM-as-judge. The judge earns its place only where a golden
-> **string can't reach** — free-form text (hallucination, false promises). **c8 is
-> the proof:** it flips PASS→FAIL only when a real model is switched on. Run it:
-> `python3 eval/run_eval.py` (add `--live-judge` for the model).
-
-The loop has **two jobs**: a **regression gate** (blocks a bad deploy) and a
-**production data flywheel** (real traffic → failures → human-in-the-loop → new
-golden → better agents). See [Page 3](docs/eval-loop.md).
+→ [**Page 3 — the evaluation loop**](docs/eval-loop.md) walks all of it, systematically.
 
 ---
 
