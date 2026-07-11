@@ -1,83 +1,152 @@
 # Application-Level Harness & Governance — Cloud Run
 
 *You build the harness. Cloud Run gives you **bare compute** (a container that
-scales) and **nothing agent-specific** — so sessions, memory, observability, and
-guardrails are all wired **in the application**, and travel with the agent
+scales) and **nothing agent-specific** — so observability, guardrails, sessions,
+memory and state are all wired **in the application**, and travel with the agent
 wherever it runs.*
 
 This is **Way 1** of two. Contrast: [Way 2 — platform-managed on Agent
 Engine](harness-agent-platform.md).
 
+> **✅ Deployed & verified (us-central1) — two containers, real A2A over HTTPS:**
+> - `refund-a2a`  → https://refund-a2a-51058313466.us-central1.run.app
+> - `care-agent`  → https://care-agent-51058313466.us-central1.run.app
+>
+> Live check: care redacts a PII email (guardrail), delegates over A2A to the
+> refund service, which runs its 4 stages on its own container and returns the
+> decision (order 67890 → APPROVE; 12345 → ESCALATE).
+
+```mermaid
+flowchart LR
+    user(["🧑 You"])
+
+    subgraph CR1["☁️ Cloud Run service: care-agent"]
+        direction TB
+        s1["serve.py — one harness entry<br/>guardrail · trace · session · memory · state"]
+        s1 --> ca["care_agent (coordinator)"]
+    end
+
+    subgraph CR2["☁️ Cloud Run service: refund-a2a"]
+        direction TB
+        a2["a2a_server.py — Agent Card<br/>/.well-known/agent-card.json"]
+        a2 --> pipe["refund_agent (4-stage pipeline)<br/>order_lookup → refund_decision<br/>→ fraud_detection → customer_reply"]
+    end
+
+    user -->|"HTTPS"| CR1
+    ca ==>|"A2A over HTTPS"| CR2
+    CR2 -->|"decision + ticket"| ca
+
+    linkStyle 3 stroke:#d81b60,stroke-width:3px
 ```
-   Cloud Run service (care)        Cloud Run service (refund)
-   ┌───────────────────────┐  A2A  ┌───────────────────────┐
-   │  ADK agent            │◀─────▶│  ADK agent            │
-   │  + harness (in app):  │       │  + harness (in app):  │
-   │  trace · memory ·     │       │  trace · guardrail    │
-   │  session/state        │       │                       │
-   └───────────────────────┘       └───────────────────────┘
-        bare compute — you bring everything above the container
-```
+
+*Two separate containers = two Cloud Run services = **real** A2A over HTTPS (not
+an in-process call). Each service brings its own harness above the bare compute.*
 
 ---
 
 ## The principle
 
-Cloud Run is a **substrate**, not an agent platform. It runs your container and
+Cloud Run is a **substrate**, not an agent platform: it runs your container and
 autoscales it — that's all. Every cross-cutting concern is therefore
-**application-level**: it lives in your code, is deployed with the agent, and
+**application-level** — it lives in your code, is deployed *with* the agent, and
 **protects the agent everywhere** (localhost, another cloud, on-prem). The cost:
-**you** are responsible for wiring, correctness, and persistence.
+**you** own the wiring, the correctness, and the persistence.
 
-## The one Cloud Run gotcha: it's stateless & multi-instance
+Two agents = **two independent services** = **real A2A** over the network (not an
+in-process call). Each is its own container with its own harness.
 
-A Cloud Run container is **ephemeral** and may run as **many instances**. So
-**in-memory harness state does not survive** — you must **externalize** it:
+## One serve entry wires the whole harness
 
-| Concern | Local (single process) | Cloud Run (stateless) → you externalize |
-|---------|------------------------|------------------------------------------|
-| Session / State | `InMemorySessionService` | `DatabaseSessionService` (a DB) |
-| Memory | `InMemoryMemoryService` | a persistent backend (Firestore / DB) |
-| Data | in-memory dict | Firestore ([03.5](../refund-agent/adk_refund/docs/03.5-firestore-data-layer.md)) |
+The load-bearing idea: each agent has a single **serve entry** that assembles the
+harness around the agent and binds `0.0.0.0:$PORT`, so the *same file* runs
+locally and in the container. Policy (`SKILL.md`) is never touched — operability
+is bolted on around it.
 
-**"Swap the backend, not the concept"** — the agent code is unchanged; only the
-service *reference* points at a durable store.
+**care — [`serve.py`](../customer-care-agent/adk_care/serve.py):**
 
-## Per concern — how it's wired (with file pointers)
+```python
+extra_plugins = ["guardrails.PIIRedactionPlugin"]          # governance: PII guardrail
+app = get_fast_api_app(
+    agents_dir=AGENTS_DIR, web=True, port=PORT,
+    extra_plugins=extra_plugins,                            # guardrail hook
+    trace_to_cloud=(TRACE_TO_CLOUD == "on"),               # observability
+    # session_service_uri / memory_service_uri → durable backends on Cloud Run
+)
+uvicorn.run(app, host="0.0.0.0", port=PORT)
+```
+
+**refund — [`a2a_server.py`](../refund-agent/adk_refund/a2a_server.py):** wraps the
+worker's `root_agent` with `to_a2a(...)`, binds `0.0.0.0:$PORT`, and advertises
+the public Agent Card URL via `A2A_PUBLIC_URL`.
+
+## Per concern — how it's wired (accurate file pointers)
 
 | Concern | Layer | How (application-level) | Where |
 |---------|-------|-------------------------|-------|
-| **Observability** | harness/gov | OTel tracer + exporters (dual: Cloud Trace + LangSmith), set at the serve layer | [`serve_dual_trace.py`](../refund-agent/adk_refund/serve_dual_trace.py) · [doc 01](../refund-agent/adk_refund/docs/01-observability-tracing.md) |
-| **Guardrail (PII)** | governance | an ADK **Plugin** (a `before_model` hook) redacts PII before every model call; registered via `extra_plugins` | [`guardrails.py`](../refund-agent/adk_refund/guardrails.py) · [doc 02](../refund-agent/adk_refund/docs/02-governance-pii-guardrail.md) |
-| **Memory** | harness | `MemoryService` + a `load_memory` tool + `add_session_to_memory` | [`m3_memory_demo.py`](../customer-care-agent/adk_care/m3_memory_demo.py) |
-| **Session / State** | harness | `SessionService` + tools writing `tool_context.state` (slot-filling) | [`session_state_demo.py`](../customer-care-agent/adk_care/session_state_demo.py) |
-| **Deploy** | ops | container → Cloud Run (`us-central1`), reuse a dev service account | [doc 03](../refund-agent/adk_refund/docs/03-cloud-run-deployment.md) |
+| **Observability** | harness/gov | tracing via `trace_to_cloud` (care) / dual Cloud Trace + LangSmith (refund playground) | care [`serve.py`](../customer-care-agent/adk_care/serve.py) · refund [`serve_dual_trace.py`](../refund-agent/adk_refund/serve_dual_trace.py) · [doc 01](../refund-agent/adk_refund/docs/01-observability-tracing.md) |
+| **Guardrail (PII)** | governance | ADK **Plugin** (`before_model` hook) redacts PII before every model call; registered via `extra_plugins` | care [`guardrails.py`](../customer-care-agent/adk_care/guardrails.py) · refund [`guardrails.py`](../refund-agent/adk_refund/guardrails.py) · [doc 02](../refund-agent/adk_refund/docs/02-governance-pii-guardrail.md) |
+| **Memory** | harness | `MemoryService` + a `load_memory` tool (InMemory locally; `MEMORY_SERVICE_URI` for durable) | care [`agent.py`](../customer-care-agent/adk_care/care_agent/agent.py) · demo [`m3_memory_demo.py`](../customer-care-agent/adk_care/m3_memory_demo.py) |
+| **Session / State** | harness | `SessionService` + `set_order_id`/`get_order_id` tools writing `tool_context.state` (slot-filling) | care [`agent.py`](../customer-care-agent/adk_care/care_agent/agent.py) · demo [`session_state_demo.py`](../customer-care-agent/adk_care/session_state_demo.py) |
+| **A2A serve** | integration | `to_a2a(...)`, `0.0.0.0:$PORT`, public card via `A2A_PUBLIC_URL` | refund [`a2a_server.py`](../refund-agent/adk_refund/a2a_server.py) |
+| **Deploy** | ops | container → Cloud Run, dev service account | [cheat sheet](deploy-cheatsheet.md) · [doc 03](../refund-agent/adk_refund/docs/03-cloud-run-deployment.md) |
 
-The pattern is consistent: **governance/harness is injected at the wiring layer
-(`serve_*.py`, `agent.py`), never in `SKILL.md`.** Policy stays byte-identical;
-operability is bolted on around it.
+## Assigned by role, not copied onto both
 
-## Two agents, assigned by role
+The harness is **distributed by role** — which is exactly what makes the
+coordinator differ from the worker:
 
-Because the two agents are **independent Cloud Run services**, each carries only
-what its role needs:
-
-- **care (intake):** trace · guardrail (first line — customer PII enters here) ·
+- **care (intake):** trace · **guardrail (first line — customer PII enters here)** ·
   **memory** · heavy **session/state**.
-- **refund (worker):** trace · guardrail (defense-in-depth on what crosses A2A).
+- **refund (worker):** the A2A endpoint · trace · guardrail (defense-in-depth).
   **No memory, minimal state** — it is short and stateless.
 
-## The cross-agent piece: distributed tracing (planned)
+## Deploy it
 
-One request spans `care → A2A → refund`. To see it as **one end-to-end trace**,
-the **trace context must propagate across the A2A call** so both services share a
-trace ID. This is the one concern that needs coordination *between* the two apps —
-not present in a single-agent setup.
+Full commands in the [**cheat sheet**](deploy-cheatsheet.md). The shape:
+
+1. **refund-a2a first** (care needs its URL): `gcloud run deploy --source .`
+   → grab the URL → set `A2A_PUBLIC_URL` + Vertex env vars → redeploy env.
+2. **care-agent**: `gcloud run deploy` with `REFUND_A2A_BASE_URL=<refund url>`,
+   `TRACE_TO_CLOUD=on`, `PII_GUARDRAIL=on`.
+
+## Gotchas we actually hit
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Agent Card advertised `localhost` | `to_a2a` bakes the card URL from host/port | set `A2A_PUBLIC_URL` to the public `*.run.app` |
+| refund: *"No API key provided"* | its `.env` is dockerignored → container defaults to API-key mode | `GOOGLE_GENAI_USE_VERTEXAI=TRUE` (+ project/location) → uses the SA |
+| `ModuleNotFoundError: a2a` | a2a extras not in the image | add `google-adk[a2a]` + `a2a-sdk[http-server]` to the Dockerfile |
+
+## Stateless & multi-instance — externalize persistence
+
+A Cloud Run container is **ephemeral** and may run as **many instances**, so
+in-memory harness state does not survive across requests. When durability
+matters, point the backend at a store — **no code change**:
+
+| Concern | Local / demo | Cloud Run (durable) |
+|---------|--------------|---------------------|
+| Session / State | `InMemorySessionService` | `SESSION_SERVICE_URI` → a DB |
+| Memory | `InMemoryMemoryService` | `MEMORY_SERVICE_URI` → a store |
+| Worker data | in-memory dict | Firestore ([03.5](../refund-agent/adk_refund/docs/03.5-firestore-data-layer.md)) |
+
+**"Swap the backend, not the concept."** The current deploy runs InMemory (fine
+for a demo); the URIs are the one-line upgrade to durable.
+
+## Still open (honest)
+
+- Refund's **A2A path** serves the pipeline but does not yet re-wire its own
+  trace + guardrail (those live on its playground path `serve_dual_trace.py`). PII
+  is redacted at **care** (first line), so the system is PII-safe; adding them to
+  `a2a_server.py` via a custom `Runner(plugins=…)` is the remaining refinement.
+- **Distributed tracing across A2A** — one request spans `care → A2A → refund`; to
+  see it as a single end-to-end trace, the trace context must propagate across the
+  hop so both services share a trace ID. This is the one concern that needs
+  coordination *between* the two apps.
 
 ## What this way demonstrates
 
-You can see exactly **what an agent platform provides** by listing everything you
-had to build here yourself: the session store, the memory backend, the trace
-export, the guardrail plugin, and the persistence to survive a stateless
-substrate. That list *is* the harness — and [Way 2](harness-agent-platform.md)
-hands most of it to the platform.
+You can read off **exactly what an agent platform provides** by listing what you
+built here yourself: the serve entry, the guardrail plugin, the trace export, the
+session/memory wiring, the A2A endpoint + its public-URL handling, and the
+persistence to survive a stateless substrate. That list *is* the harness — and
+[Way 2](harness-agent-platform.md) hands most of it to the platform.
