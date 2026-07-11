@@ -4,12 +4,15 @@
 > This folder was renamed from `customer-refund-agent` → `customer-care-agents`;
 > the Claude Code memory was migrated along with it, so recall should still work
 > (if not, read `MEMORY.md`). **Where we are:** the `refund-agent` worker is
-> **done and deployed to Agent Engine**. The coordinator's **M1 is built**:
-> design doc (`customer-care-agent/docs/01-coordinator-design.md`) + a working
-> Claude Code **skill** prototype (`customer-care-agent/.claude/skills/customer-care/`)
-> with a multi-turn conversation test set. **Next action:** run the local
-> prototype (see its `TESTING.md`), then **M2 — wire it in ADK** with the refund
-> worker as an in-process `sub_agent`.
+> **done and deployed to Agent Engine**. The coordinator is built through **M2**:
+> M1 = Claude Code skill (routing + slot-filling); M2 = **ADK, and the two agents
+> are wired over the A2A protocol, running locally** — `care_agent` (client,
+> `adk web` :8042) delegates refunds to `refund_agent` (A2A server, uvicorn
+> :8043) via `to_a2a` + `RemoteA2aAgent`. Verified end-to-end (see
+> `customer-care-agent/docs/03-a2a-local.md` and the README cheatsheet).
+> **Next action:** **M3 — memory** (remember the returning customer) and **M4 —
+> context management** (long conversations) — the parts where the coordinator
+> truly diverges from the worker. See [[a2a-local-two-agent-setup]].
 > **How to teach me (the user):** concept-first, big-picture-first, one step at a
 > time, repetition welcome; explain the concept, let me say it back in my own
 > words, *then* go hands-on. See [[user-learning-style]].

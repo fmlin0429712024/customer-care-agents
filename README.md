@@ -1,143 +1,109 @@
-# Customer Care Agents — an agent-systems engineering showcase
+# Customer Care Agents — two ADK agents wired over A2A (runs 100% local)
 
-> Two agents built to practice the **hard parts** of agentic engineering:
-> multi-agent orchestration, agent-to-agent handoff (**A2A**), session & state,
-> long-term memory, context management, governance, evaluation, and deployment
-> on Google's agent stack.
-
-**This is a concepts showcase, not a business demo.** The customer-service
-domain is deliberately kept trivial — a front desk that routes to a specialist.
-The engineering, not the business logic, is the point. (Complex-domain modeling
-is demonstrated in my other projects.)
-
----
-
-## Architecture — a coordinator and a worker
-
-Two agents, developed side by side, that compose like functions: from the
-outside, the whole refund worker is **one black box** with one input and one
-output.
+A conversational **coordinator** that delegates to a specialist **refund worker**
+over the **A2A protocol**. Both agents are authored as Claude-Code **SKILLs**,
+migrated **verbatim** to **Google ADK**, and run **entirely on localhost** — no
+cloud required.
 
 ```
-                  ┌──────────────────────────────┐
-   customer ⇄     │   customer-care-agent         │   the COORDINATOR
-                  │   · conversational front desk │   · long, multi-turn session
-                  │   · understands intent        │   · owns memory + context
-                  │   · routes & holds the convo  │
-                  └───────────────┬──────────────┘
-                                  │  handoff contract
-                                  │  { order_id } → { decision, ticket }
-                                  ▼
-                  ┌──────────────────────────────┐
-                  │   refund-agent (worker)       │   the WORKER  ✅ built
-                  │   · one job, ~30s, then done  │   · SequentialAgent, 4 stages
-                  │   · black box to the caller   │   · deployed to Agent Engine
-                  └──────────────────────────────┘
+   You ──chat──▶  care_agent   (coordinator · LLM-routed · :8042 dev-ui)
+                      │
+                      │   A2A  (HTTP + Agent Card, the frozen interface)
+                      ▼
+                 refund_agent  (worker · SequentialAgent · :8043 A2A server)
+                      │
+        order_lookup ─▶ refund_decision ─▶ fraud_detection ─▶ customer_reply
 ```
 
-The coordinator can call the worker **in-process** (ADK `sub_agents` / `AgentTool`)
-or, once each is deployed independently, **over the A2A protocol** — the same
-handoff contract, moved onto the network with real identity and auth. This is
-deliberately the shape of **Gemini Enterprise / Agentspace**: a conversational
-front door that dispatches to registered specialist agents.
+The coordinator sees the worker as a **black box**: it sends an `order_id`, it
+gets back a decision. The worker's 4-stage pipeline is hidden behind the A2A
+Agent Card.
 
 ---
 
-## Concepts demonstrated — the point of this repo
+## The recipe — SKILLs → ADK → A2A → localhost
 
-| Concept | Where it lives | Learned as behavior (Claude Code) or mechanism (ADK / platform) | Status |
-|---|---|---|---|
-| **Orchestration — fixed (workflow)** | worker `SequentialAgent` | mechanism | ✅ done |
-| **Orchestration — dynamic (LLM-routed)** | coordinator | behavior → mechanism | 🟡 M1 designed |
-| **Multi-agent handoff contract** | coordinator ↔ worker | behavior → mechanism | 🟡 M1 designed |
-| **Tool use / function calling** | worker `tools.py` (SQLite) | mechanism | ✅ done |
-| **Session & state** | coordinator | mechanism (hidden in Claude Code) | ⬜ M3 (ADK) |
-| **Long-term memory** | coordinator (Memory Bank) | mechanism | ⬜ M3 (ADK) |
-| **Context management** (long chats) | coordinator | mechanism | ⬜ M4 (ADK) |
-| **A2A — remote agent-to-agent call** | coordinator → worker | mechanism | ⬜ M5 |
-| **Identity & security boundary** | A2A layer | mechanism | ⬜ M5 |
-| **Observability — tracing** | worker (OTel → Cloud Trace + LangSmith) | mechanism | ✅ done |
-| **Governance — PII guardrail** | worker (ADK Plugin) | mechanism | ✅ done |
-| **Evaluation — regression gate** | worker (`adk eval`, golden set) | mechanism | ✅ done |
-| **Evaluation — LLM-as-judge (conversation)** | coordinator (`care-evaluator` agent) | behavior → mechanism | 🟡 M1 built |
-| **Deployment tiers** | worker (local → Cloud Run → Agent Engine) | mechanism | ✅ done |
-| **Register to Gemini Enterprise** | both | mechanism | ⬜ M6 |
+### 1 · Refund Agent (worker) — the A2A **server**
 
-Two agents are enough to practice all of this — the value is depth per concept,
-not sprawling to many specialists.
+| Layer | What | Where |
+|-------|------|-------|
+| **Policy** | 8 `SKILL.md` files (Claude Code), copied **byte-identical** | [`refund_agent/skills/customer-refund/`](refund-agent/adk_refund/refund_agent/skills/customer-refund/) |
+| **ADK agent** | `SequentialAgent` = 4 sub-agents; `tools.py` (Firestore) | [`refund_agent/agent.py`](refund-agent/adk_refund/refund_agent/agent.py) |
+| **Expose over A2A** | `a2a_app = to_a2a(root_agent, port=8043)` — one wrapper, agent.py untouched | [`a2a_server.py`](refund-agent/adk_refund/a2a_server.py) |
+
+```bash
+cd refund-agent/adk_refund
+.venv/bin/uvicorn a2a_server:a2a_app --host localhost --port 8043
+# → Agent Card auto-generated at  http://localhost:8043/.well-known/agent-card.json
+```
+
+### 2 · Care Agent (coordinator) — the A2A **client**
+
+| Layer | What | Where |
+|-------|------|-------|
+| **Policy** | `customer-care/SKILL.md` (routing · slot-filling), copied verbatim | [`care_agent/skills/customer-care/`](customer-care-agent/adk_care/care_agent/skills/customer-care/) |
+| **ADK agent** | LLM `Agent`; consumes the worker as a sub-agent | [`care_agent/agent.py`](customer-care-agent/adk_care/care_agent/agent.py) |
+| **Call over A2A** | `RemoteA2aAgent(agent_card="http://localhost:8043/.well-known/agent-card.json")` | same file |
+
+```bash
+cd customer-care-agent/adk_care
+.venv/bin/adk web --port 8042 .
+# → open http://127.0.0.1:8042 , pick care_agent
+```
+
+### 3 · Run the whole system (2 terminals)
+
+```bash
+# terminal 1 — refund A2A server (start first)
+cd refund-agent/adk_refund && .venv/bin/uvicorn a2a_server:a2a_app --host localhost --port 8043
+
+# terminal 2 — care coordinator playground
+cd customer-care-agent/adk_care && .venv/bin/adk web --port 8042 .
+```
+
+Then in the care dev-ui: `I want my money back` → it asks for the order → `order 12345`
+→ open the **Events / Traces** tab and watch **`transfer_to_agent("refund_agent")`**
+fire the A2A call. The remote worker runs all 4 stages and the decision comes back.
+
+> **One-time setup** if starting fresh: each agent gets its own venv
+> (`python3 -m venv .venv && .venv/bin/pip install -e .`) plus the A2A extras
+> `pip install "google-adk[a2a]" "a2a-sdk[http-server]"`. Full runbook:
+> [docs/03-a2a-local.md](customer-care-agent/docs/03-a2a-local.md).
 
 ---
+
+## The ideas worth knowing (the interview-relevant bones)
+
+- **SKILL.md = policy, verbatim.** Identical bytes Claude Code → ADK; only the
+  *host wiring* (`agent.py`: tools, `output_key`, the A2A hookup) differs per
+  environment. Never re-author policy in Python.
+- **A2A = agent → agent** over a **frozen interface** (the Agent Card). Contrast
+  **MCP = agent → tools**. In-process `sub_agent` is the same handoff *co-located*;
+  A2A is the same handoff *over the network*. Choice is **topology, not quality**.
+- **`to_a2a()` does the protocol for you** — auto-generates the Agent Card, the
+  executor, the task store, the routes. You write one line.
+- **Local = files + localhost.** SQLite/Firestore for data, `session.db` for
+  sessions, HTTP over `127.0.0.1` for A2A. The cloud swaps backends, not the code.
 
 ## The two agents
 
-| Agent | Role | Session | The hard parts it carries | Status |
-|---|---|---|---|---|
-| [`refund-agent/`](refund-agent/) | **worker** — specialist | short, one-shot | tools, tracing, guardrail, eval, deploy | ✅ done (on Agent Engine) |
-| [`customer-care-agent/`](customer-care-agent/) | **coordinator** — front desk | long, multi-turn | routing, memory, context, A2A | 🟡 building (M1) |
-
----
-
-## Roadmap (the coordinator's learning arc)
-
-| # | Milestone | The concept it teaches |
-|---|-----------|------------------------|
-| **M1** | LLM-routed orchestration + handoff contract (design) | dynamic routing, black-box handoff |
-| **M2** | Minimal ADK coordinator → worker as in-process `sub_agent` | multi-agent composition |
-| **M3** | Memory Bank | long-term memory, session & state |
-| **M4** | Context management | windowing, summarization, retrieval |
-| **M5** | Split deployments + remote **A2A** call | agent interop, identity, security |
-| **M6** | Register to Gemini Enterprise / Agentspace | the enterprise agent surface |
-
-**Two learning tracks:** *behavior* is prototyped fast and locally in Claude Code
-(routing, persona, the contract's shape); the *mechanisms* that Claude Code hides
-— session, state, memory, context, identity — are learned explicitly on **Google
-ADK and the Gemini Enterprise Agent Platform**.
-
----
+| Agent | Role | Session | Status |
+|-------|------|---------|--------|
+| [`refund-agent/`](refund-agent/) | worker · specialist | short, one-shot | ✅ done · also deployed to Agent Engine |
+| [`customer-care-agent/`](customer-care-agent/) | coordinator · front desk | long, multi-turn | ✅ routing · slot-filling · **A2A handoff** |
 
 ## Docs
 
-Each milestone gets one page.
-
-**Coordinator** — [`customer-care-agent/docs/`](customer-care-agent/docs/)
-
 | # | Doc | Covers |
 |---|-----|--------|
-| 01 | [Coordinator design & handoff contract](customer-care-agent/docs/01-coordinator-design.md) | LLM routing, the handoff contract, and how it becomes A2A |
-| 02 | [Conversation eval](customer-care-agent/docs/02-conversation-eval.md) | trajectory eval, deterministic checks + LLM-as-judge, rubric, runnable |
+| 01 | [Coordinator design](customer-care-agent/docs/01-coordinator-design.md) | routing · handoff contract · how it becomes A2A |
+| 02 | [Conversation eval](customer-care-agent/docs/02-conversation-eval.md) | trajectory eval · LLM-as-judge · rubric |
+| 03 | [**A2A, local, step by step**](customer-care-agent/docs/03-a2a-local.md) | expose (`to_a2a`) · consume (`RemoteA2aAgent`) · run · gotchas |
 
-**Worker** — [`refund-agent/adk_refund/docs/`](refund-agent/adk_refund/docs/) (built series)
+Worker deep-dives (tracing · guardrail · Cloud Run · Firestore · eval · Agent Engine):
+[`refund-agent/adk_refund/docs/`](refund-agent/adk_refund/docs/).
 
-| # | Doc | Covers |
-|---|-----|--------|
-| 01 | [Observability: tracing](refund-agent/adk_refund/docs/01-observability-tracing.md) | OTel → Cloud Trace + LangSmith, dual export |
-| 02 | [Governance: PII guardrail](refund-agent/adk_refund/docs/02-governance-pii-guardrail.md) | ADK Plugin redaction, managed vs custom |
-| 03 | [Deployment: Cloud Run](refund-agent/adk_refund/docs/03-cloud-run-deployment.md) | single-region deploy, service account |
-| 03.5 | [Data layer: SQLite → Firestore](refund-agent/adk_refund/docs/03.5-firestore-data-layer.md) | swap storage, agent unchanged |
-| 04 | [Evaluation: adk eval](refund-agent/adk_refund/docs/04-evaluation-adk-eval.md) | offline regression gate |
-| 05 | [Deployment: Agent Engine](refund-agent/adk_refund/docs/05-agent-engine-deployment.md) | managed agent tier, Vertex auth |
+## What's next
 
----
-
-## Repo structure
-
-```
-customer-care-agents/
-├── README.md                         ← you are here (the front door)
-├── CLAUDE.md                         ← overview + roadmap (for AI assistants)
-├── customer-care-agent/              ← COORDINATOR (building)
-│   ├── README.md
-│   ├── TESTING.md                    ← conversation (trajectory) test cheat sheet
-│   ├── docs/                         ← design & milestone docs
-│   └── .claude/skills/
-│       ├── customer-care/            ← coordinator skill + conversation scenarios
-│       └── care-evaluator/           ← LLM-as-judge eval agent (grades the coordinator)
-└── refund-agent/                     ← WORKER (done, deployed)
-    ├── adk_refund/                   ← the ADK agent + docs series
-    └── .claude/skills/customer-refund/
-```
-
----
-
-**Status:** worker done & deployed to Agent Engine · coordinator at M1 (design).
-**Stack:** Google ADK · Vertex AI / Agent Engine · A2A · Claude Code (prototyping).
+Memory (remember the returning customer) and context management (long
+conversations) — the parts where the coordinator truly diverges from the worker.

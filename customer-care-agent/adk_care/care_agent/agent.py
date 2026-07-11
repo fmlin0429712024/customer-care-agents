@@ -1,25 +1,27 @@
-"""Customer Care Coordinator — Google ADK (M0: solo, stub handoff).
+"""Customer Care Coordinator — Google ADK (M2: real handoff over A2A).
 
-The conversational front desk. Unlike the refund worker (a fixed
-`SequentialAgent`), this is a single **LLM-routed** `Agent`: it reads the
-customer's message, classifies intent, does slot-filling, and *would* hand off
-to a specialist.
+The conversational front desk. A single **LLM-routed** `Agent` that reads the
+customer's message, classifies intent, does slot-filling, and — when a refund is
+ready — **delegates to the refund specialist over the A2A protocol**.
 
-At M0 it runs **SOLO** — no worker is connected — so the handoff is a **stub**:
-it emits what it *would* dispatch instead of calling anything. This isolates the
-coordinator so we can verify routing + slot-filling before wiring the worker
-(M2), memory (M3), or context management (M4).
+The refund specialist runs as a separate **A2A server** (see
+`refund-agent/adk_refund/a2a_server.py`, port 8043). Here it is consumed with the
+official `RemoteA2aAgent`, pointed at the specialist's auto-generated Agent Card.
+Docs: https://adk.dev/a2a/quickstart-consuming/
 
-Policy/behavior lives **verbatim** in the bundled `SKILL.md` (byte-identical to
-`.claude/skills/customer-care/`). The M0 stub is **host wiring** appended here —
-never written into the skill. Same split the worker uses.
+Policy/behavior lives **verbatim** in the bundled `SKILL.md`. The A2A wiring is
+**host wiring** appended here — never written into the skill.
 
-Run from `adk_care/`:  `adk web`  → pick `care_agent`.
+Run from `adk_care/`:  `adk web --port 8042 .`   (refund A2A server must be up.)
 """
 
 from pathlib import Path
 
 from google.adk.agents import Agent
+from google.adk.agents.remote_a2a_agent import (
+    AGENT_CARD_WELL_KNOWN_PATH,
+    RemoteA2aAgent,
+)
 
 MODEL = "gemini-2.5-flash"
 
@@ -34,22 +36,34 @@ def load_skill(relpath: str) -> str:
 
 _coordinator_skill = load_skill("SKILL.md")
 
-# --- Host wiring: M0 stub handoff (NOT part of the skill) -------------------
-_M0_HOST_WIRING = """
+# --- The refund specialist, consumed over A2A (official RemoteA2aAgent) -----
+REFUND_A2A_URL = f"http://localhost:8043{AGENT_CARD_WELL_KNOWN_PATH}"
+
+refund_remote = RemoteA2aAgent(
+    name="refund_agent",
+    description=(
+        "Remote refund specialist reached over A2A. Give it a customer order id "
+        "and it returns the refund decision (APPROVE / ESCALATE / REJECT), reason "
+        "code, and ticket if escalated."
+    ),
+    agent_card=REFUND_A2A_URL,
+    use_legacy=False,
+)
+
+# --- Host wiring: the specialist is now really connected (NOT in the skill) --
+_A2A_HOST_WIRING = """
 ---
-## M0 host wiring — solo run (no specialist connected)
+## Host wiring — the refund specialist is connected (via A2A)
 
-You are running STANDALONE for milestone M0. No refund worker is wired in yet,
-so you CANNOT actually hand off and you must NOT invent a refund decision,
-amount, or ticket. Follow the SKILL.md exactly for greeting, intent routing,
-and slot-filling. At the moment you WOULD hand off to the refund specialist,
-emit a single stub line:
+You are connected to a real refund specialist: a sub-agent named `refund_agent`
+(a remote A2A service). When the customer wants a refund AND you have collected
+their order id, delegate the task to `refund_agent`, passing the order id (e.g.
+"Process refund for order <id>"). Let the specialist produce the decision, then
+relay its outcome to the customer faithfully and warmly.
 
-    [STUB HANDOFF -> refund]  { intent: "refund", order_id: "<the id>" }
-
-then tell the customer the request has been captured and would be routed to the
-refund specialist (not online in this milestone). This lets us verify routing
-and slot-filling before any specialist, memory, or context management is added.
+Never invent a refund decision, amount, or ticket yourself — that is the
+specialist's job. If the order id is still missing, ask for it first (do not
+delegate without it).
 """
 
 # The only symbol ADK requires from this module.
@@ -58,8 +72,9 @@ root_agent = Agent(
     name="care_agent",
     description=(
         "Conversational customer-care coordinator: greets the customer, "
-        "understands intent across turns, fills required inputs, and routes to "
-        "a specialist (refund handoff is stubbed at M0)."
+        "understands intent across turns, fills required inputs, and delegates "
+        "refunds to a remote specialist over A2A."
     ),
-    instruction=_coordinator_skill + _M0_HOST_WIRING,
+    instruction=_coordinator_skill + _A2A_HOST_WIRING,
+    sub_agents=[refund_remote],
 )
