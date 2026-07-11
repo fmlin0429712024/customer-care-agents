@@ -15,16 +15,6 @@ Agent Engine.*
 >
 > **That comparison is the value. Everything below is the context that makes it land.**
 
-```
-   You ──chat──▶  care_agent   (coordinator · intake · long, multi-turn · :8042)
-                      │
-                      │   A2A  (HTTP + Agent Card — the frozen interface)
-                      ▼
-                 refund_agent  (worker · specialist · short, one-shot · :8043)
-                      │
-        order_lookup ─▶ refund_decision ─▶ fraud_detection ─▶ customer_reply
-```
-
 An **agent system**, not a single agent: a conversational **coordinator** that
 takes the customer intake and, when the topic turns to a refund, delegates to an
 independent **specialist worker** over the A2A protocol. This mirrors the
@@ -36,6 +26,30 @@ Three questions an interviewer asks, three sections:
 ---
 
 ## 1 · The solution — *what it does*
+
+```mermaid
+flowchart TB
+    user(["🧑 Customer"])
+
+    subgraph CARE["care_agent — coordinator · intake · long, multi-turn"]
+        route["classify intent · slot-fill order_id"]
+    end
+
+    subgraph REFUND["refund_agent — worker · specialist · short, one-shot"]
+        direction LR
+        s1["order_lookup"] --> s2["refund_decision"] --> s3["fraud_detection"] --> s4["customer_reply"]
+    end
+
+    user -->|"chat"| CARE
+    CARE ==>|"A2A · Agent Card — frozen interface"| REFUND
+    REFUND -->|"decision + ticket"| CARE
+    CARE -->|"reply"| user
+
+    linkStyle 4 stroke:#d81b60,stroke-width:3px
+```
+
+*The A2A hop (bold) is the frozen interface: the coordinator sends an `order_id`,
+the worker returns a decision — the 4-stage pipeline stays hidden behind it.*
 
 | Agent | Role | Session shape | Job |
 |-------|------|---------------|-----|
