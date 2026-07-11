@@ -16,7 +16,13 @@ LangSmith** (see *Where the trajectory comes from*, below).
 > failures, each by a different mechanism** — the whole point:
 > - **c5** — care self-decides instead of delegating → caught by the **trajectory axis**
 > - **c6** — worker returns the wrong decision → caught by the **golden set**
-> - **c7** — worker's decision is right but the reply **hallucinates an approval** → caught **only by the LLM-as-judge**
+> - **c7** — worker's decision is right but the reply **hallucinates an approval** → a failure the **golden set structurally cannot see** (it lives on the free-text reply — the column an LLM-as-judge owns)
+>
+> **Honesty note:** the default run is **offline** — the reply column is scored by a
+> **deterministic keyword proxy, not a real LLM**. c7's phrasing is obvious enough
+> ("approved" in an escalated reply) that the proxy catches it, so *this instance*
+> does not by itself prove an LLM was needed. A **subtler** hallucination would slip
+> past the keywords and require `--live-judge`. See *What actually runs*, below.
 
 ```
    dataset/cases.jsonl        traces/*.json          judge.py              results/
@@ -74,11 +80,24 @@ So each mechanism guards a different output shape:
 | **crisp / categorical** (`APPROVE`/`ESCALATE`/`REJECT`) | golden exact match | ❌ assertion |
 | **free-form text** (the customer reply — tone, false promises, hallucination) | **LLM-as-judge** vs a rubric | ✅ |
 
-**c7 is the proof.** Its decision is correct, so any golden match **passes** —
-yet the reply tells the customer their refund was *approved* when it was only
-*escalated*. No golden **string** can enumerate every bad reply; only a judge that
-**reasons** about consistency and policy can catch it. That is where — and why —
-LLM-as-judge exists.
+**c7 shows the structural point.** Its decision is correct, so any golden match
+**passes** — yet the reply tells the customer their refund was *approved* when it
+was only *escalated*. No golden **string** can enumerate every bad reply, so the
+reply needs a **separate mechanism** on that column. *In general* that mechanism is
+an LLM-as-judge that **reasons** about consistency and policy — that is where and
+why LLM-as-judge exists.
+
+> **What actually runs (no exaggeration).** In the default **offline** mode the
+> reply column is a **deterministic keyword proxy**, *not* a real LLM — and c7's
+> hallucination is blunt enough ("approved") that the proxy catches it. So today's
+> loop is **100% deterministic**, and c7 does **not** by itself prove an LLM was
+> required; a keyword did the job because the case is simple. The LLM-as-judge's
+> unique value appears only on **subtler** replies (e.g. *"you're all set, expect
+> your money soon"* — no "approved" to grep) or under `--live-judge`. Two honest
+> corollaries: for the **categorical decision**, a stronger/weaker judge model
+> makes **no difference** (`APPROVE == APPROVE` — golden is simply the right tool);
+> the judge's model, temperature, and rubric matter **only** on the free-text
+> column, and **only** when the real model is switched on.
 
 > **Why a judge can catch what the worker missed:** not "a bigger model," but
 > **verification is easier than generation** (grading < solving). The judge is
