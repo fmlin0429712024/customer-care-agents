@@ -125,9 +125,8 @@ state, set on `care-agent` (no code change — "swap the backend, not the concep
 
 ## Still open (honest)
 
-- Refund's **A2A path** serves the pipeline but does **not** yet re-wire trace +
-  guardrail (those live on the playground path `serve_dual_trace.py`). PII is
-  redacted at **care** (first line), so the system is PII-safe; adding them to
-  `a2a_server.py` via a custom `Runner(plugins=…)` is the remaining refinement.
+- **Distributed tracing across A2A** — each service traces itself, but stitching
+  `care → A2A → refund` into a single end-to-end trace needs trace-context
+  propagation across the hop. Observability polish, not a blocker.
 - **Persistence** is still InMemory on Cloud Run — fine for a demo, but memory/
   state won't survive across instances until `*_SERVICE_URI` point at a store.

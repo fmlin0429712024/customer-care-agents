@@ -76,8 +76,18 @@ uvicorn.run(app, host="0.0.0.0", port=PORT)
 ```
 
 **refund — [`a2a_server.py`](../refund-agent/adk_refund/a2a_server.py):** wraps the
-worker's `root_agent` with `to_a2a(...)`, binds `0.0.0.0:$PORT`, and advertises
-the public Agent Card URL via `A2A_PUBLIC_URL`.
+worker's `root_agent` with `to_a2a(...)`, binds `0.0.0.0:$PORT`, advertises the
+public Agent Card URL via `A2A_PUBLIC_URL`, **and carries the same harness as the
+playground** — the guardrail via a custom `Runner(plugins=[…])` that overrides
+`to_a2a`'s bare default Runner, and tracing via the global OTel `TracerProvider`
+configured before the app is built.
+
+> **Why the harness must be re-attached here:** `to_a2a` builds its **own**
+> Runner, and the harness lives on the Runner (guardrail plugins) and the process
+> (OTel exporter). Switching serve entries = a new Runner, so the harness is
+> re-wired on the entry you actually deploy. (Verified locally: the guardrail hook
+> fires on every model call, and spans cover `invocation → invoke_agent … →
+> call_llm → execute_tool`.)
 
 ## Per concern — how it's wired (accurate file pointers)
 
@@ -134,14 +144,12 @@ for a demo); the URIs are the one-line upgrade to durable.
 
 ## Still open (honest)
 
-- Refund's **A2A path** serves the pipeline but does not yet re-wire its own
-  trace + guardrail (those live on its playground path `serve_dual_trace.py`). PII
-  is redacted at **care** (first line), so the system is PII-safe; adding them to
-  `a2a_server.py` via a custom `Runner(plugins=…)` is the remaining refinement.
-- **Distributed tracing across A2A** — one request spans `care → A2A → refund`; to
-  see it as a single end-to-end trace, the trace context must propagate across the
-  hop so both services share a trace ID. This is the one concern that needs
-  coordination *between* the two apps.
+- **Distributed tracing across A2A** — each service now traces itself, but one
+  request spans `care → A2A → refund`; to see it as a **single** end-to-end trace,
+  the trace context must propagate across the hop so both services share a trace
+  ID. This is the one concern that needs coordination *between* the two apps.
+- **Persistence** is still InMemory on Cloud Run — fine for a demo, but session/
+  memory won't survive across instances until `*_SERVICE_URI` point at a store.
 
 ## What this way demonstrates
 
