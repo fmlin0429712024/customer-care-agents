@@ -1,0 +1,7 @@
+# Care coordinator — runtime deps (Cloud-Run-ready serve).
+google-adk[a2a]==2.4.0
+a2a-sdk[http-server]
+python-dotenv
+uvicorn
+# Cloud Trace exporter (used when TRACE_TO_CLOUD=on).
+opentelemetry-exporter-gcp-trace==1.12.0
