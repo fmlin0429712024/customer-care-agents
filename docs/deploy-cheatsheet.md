@@ -3,6 +3,14 @@
 Both agents carry the **full application-level harness** (Way 1). The same serve
 files run locally and on Cloud Run — `0.0.0.0:$PORT`, backends swap via env.
 
+> **✅ Deployed & verified (us-central1):** two separate containers = real A2A.
+> - `refund-a2a`  → https://refund-a2a-51058313466.us-central1.run.app
+> - `care-agent`  → https://care-agent-51058313466.us-central1.run.app
+>
+> Verified live: care redacts a PII email (guardrail), delegates over A2A/HTTPS,
+> refund runs its 4 stages on its own container and returns the decision
+> (order 67890 → APPROVE; 12345 → ESCALATE).
+
 ## What each agent now has
 
 | | refund (worker) | care (coordinator) |
@@ -54,18 +62,27 @@ The A2A container entrypoint is `a2a_server.py` (not the playground
 for this service, then:
 
 ```bash
-cd refund-agent/adk_refund
+cd refund-agent/adk_refund   # Dockerfile CMD = a2a_server.py; installs a2a extras
 gcloud run deploy refund-a2a \
   --source=. --region=us-central1 \
   --service-account=refund-agent-dev@linkhealth-care-2024.iam.gserviceaccount.com \
   --allow-unauthenticated
 
-# The Agent Card must advertise the PUBLIC url, not localhost. Grab the URL,
-# then set it and redeploy env (the card is built from A2A_PUBLIC_URL):
+# Two env fixes after first deploy (both learned the hard way):
 RURL=$(gcloud run services describe refund-a2a --region=us-central1 --format='value(status.url)')
-gcloud run services update refund-a2a --region=us-central1 \
-  --set-env-vars=A2A_PUBLIC_URL=$RURL
+gcloud run services update refund-a2a --region=us-central1 --update-env-vars=\
+A2A_PUBLIC_URL=$RURL,\
+GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_PROJECT=linkhealth-care-2024,GOOGLE_CLOUD_LOCATION=us-central1
 ```
+
+> **Two gotchas here:**
+> 1. **Agent Card URL** — `to_a2a` bakes the card `url` from host/port; on Cloud
+>    Run it must be the public `*.run.app`, hence `A2A_PUBLIC_URL`. Verify:
+>    `curl -s $RURL/.well-known/agent-card.json | jq .url`.
+> 2. **Model auth** — the worker's `.env` is dockerignored, so the container has
+>    no auth config and defaults to API-key mode → *"No API key provided."* Set
+>    `GOOGLE_GENAI_USE_VERTEXAI=TRUE` (+ project/location) so it uses the service
+>    account. The SA needs `roles/aiplatform.user`.
 
 > **The one A2A-on-Cloud-Run gotcha:** `to_a2a` bakes the Card's `url` from
 > host/port. Locally that's `localhost:8043`; on Cloud Run it must be the public
@@ -100,15 +117,17 @@ state, set on `care-agent` (no code change — "swap the backend, not the concep
 
 | # | Symptom | Fix |
 |---|---------|-----|
-| 1 | `ModuleNotFoundError: a2a` | run from the venv with `google-adk[a2a]` + `a2a-sdk[http-server]` (refund `.venv`) |
-| 2 | care's Agent Card points at `localhost:8043` from Cloud Run | set `A2A_PUBLIC_URL` on the refund service, redeploy env |
-| 3 | Cloud Trace writes 403 | grant SA `roles/cloudtrace.agent` |
-| 4 | memory/state lost after a request on Cloud Run | externalize via `SESSION_SERVICE_URI` / `MEMORY_SERVICE_URI` |
+| 1 | `ModuleNotFoundError: a2a` in the container | add `google-adk[a2a]` + `a2a-sdk[http-server]` to the Dockerfile pip install |
+| 2 | Agent Card advertises `localhost` from Cloud Run | set `A2A_PUBLIC_URL` on the refund service, redeploy env |
+| 3 | refund model: *"No API key provided"* | its `.env` is dockerignored → set `GOOGLE_GENAI_USE_VERTEXAI=TRUE` (+ project/location) so it uses the SA |
+| 4 | Cloud Trace writes 403 | grant SA `roles/cloudtrace.agent` |
+| 5 | memory/state lost after a request on Cloud Run | externalize via `SESSION_SERVICE_URI` / `MEMORY_SERVICE_URI` |
 
 ## Still open (honest)
 
 - Refund's **A2A path** serves the pipeline but does **not** yet re-wire trace +
-  guardrail (those live on the playground path `serve_dual_trace.py`). Adding them
-  to `a2a_server.py` via a custom `Runner(plugins=…)` is the remaining refinement.
-- The Cloud Run deploys above are **not yet run** — commands are ready; they are
-  billable and modify the shared project, so run them with intent.
+  guardrail (those live on the playground path `serve_dual_trace.py`). PII is
+  redacted at **care** (first line), so the system is PII-safe; adding them to
+  `a2a_server.py` via a custom `Runner(plugins=…)` is the remaining refinement.
+- **Persistence** is still InMemory on Cloud Run — fine for a demo, but memory/
+  state won't survive across instances until `*_SERVICE_URI` point at a store.
