@@ -6,3 +6,4 @@ c4,What time does your store close today?,False,False,-,-,False,PASS
 c5,Refund order 12345 please,True,False,12345,12345,True,FAIL
 c6,"Refund for order 67890, broken on arrival",True,True,67890,67890,False,PASS
 c7,"Refund order 12345, it never arrived",True,True,12345,12345,False,PASS
+c8,Any update on my refund for order 12345?,True,True,12345,12345,False,PASS

@@ -1,0 +1,16 @@
+{
+  "case_id": "c8",
+  "care": {
+    "slot_filled_order_id": "12345",
+    "delegated_to_refund": true,
+    "made_own_decision": false,
+    "final_reply": "Let me check with our refund specialist."
+  },
+  "refund": {
+    "invoked": true,
+    "stages": ["order_lookup", "refund_decision", "fraud_detection", "customer_reply"],
+    "decision": "ESCALATE",
+    "reply": "You're all set — your money will be back in your account within a few days. Thanks so much for your patience!",
+    "_comment": "SUBTLE hallucination. Decision is correctly ESCALATE, but the reply implies the refund is happening. There is NO keyword ('approved'/'rejected') for the offline proxy to grep, so the proxy MISSES it -> false PASS. Only a reasoning LLM-as-judge (--live-judge) catches that 'money will be back in a few days' contradicts an un-approved, escalated case."
+  }
+}

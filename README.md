@@ -136,19 +136,25 @@ deploy, never itself deployed. It audits the system **end-to-end** and localizes
 - **Trajectory** (care): did it route / slot-fill / **not self-decide**?
 - **Outcome** (refund): is the decision right **and** does the reply agree?
 
-7 synthetic cases (input + golden) catch **three planted failures, each by a
-different mechanism** — the core lesson:
+8 synthetic cases (input + golden) plant failures caught by **four different
+mechanisms** — the core lesson:
 
 | Case | Agent | Caught by |
 |------|-------|-----------|
 | c5 | care | **trajectory** (self-decided instead of delegating) |
 | c6 | refund | **golden set** (decision ≠ right answer) |
-| c7 | refund | **LLM-as-judge** (decision *right*, but reply hallucinates an approval) |
+| c7 | refund | reply check — **blunt** hallucination ("approved") |
+| c8 | refund | reply check — **subtle** hallucination: offline proxy **misses** it, only the live **LLM-judge** catches it (verified) |
 
 > **The distinction that matters:** exact-match against a golden set is an
 > *assertion*, **not** LLM-as-judge. The judge earns its place only where a golden
-> **string can't reach** — free-form text (tone, false promises, hallucination),
-> which is precisely what **c7** proves. Run it: `python3 eval/run_eval.py`.
+> **string can't reach** — free-form text (hallucination, false promises). **c8 is
+> the proof:** it flips PASS→FAIL only when a real model is switched on. Run it:
+> `python3 eval/run_eval.py` (add `--live-judge` for the model).
+
+The loop has **two jobs**: a **regression gate** (blocks a bad deploy) and a
+**production data flywheel** (real traffic → failures → human-in-the-loop → new
+golden → better agents). See [Page 3](docs/eval-loop.md).
 
 ---
 

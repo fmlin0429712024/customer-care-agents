@@ -12,17 +12,19 @@ needs Cloud Run nor Agent Engine, and it needs **neither Cloud Trace nor
 LangSmith** (see *Where the trajectory comes from*, below).
 
 > **✅ Runs locally, zero external deps:** `python3 eval/run_eval.py`
-> 7 synthetic cases → two result sheets. The suite catches **three planted
-> failures, each by a different mechanism** — the whole point:
+> 8 synthetic cases → two result sheets. The suite plants **failures caught by
+> four different mechanisms** — each isolating a distinct point:
 > - **c5** — care self-decides instead of delegating → caught by the **trajectory axis**
 > - **c6** — worker returns the wrong decision → caught by the **golden set**
 > - **c7** — worker's decision is right but the reply **hallucinates an approval** → a failure the **golden set structurally cannot see** (it lives on the free-text reply — the column an LLM-as-judge owns)
 >
+> - **c8** — a **subtler** hallucination (*"your money will be back in a few days"*, no keyword) → the offline proxy **misses it (false PASS)**; only `--live-judge` catches it (verified)
+>
 > **Honesty note:** the default run is **offline** — the reply column is scored by a
 > **deterministic keyword proxy, not a real LLM**. c7's phrasing is obvious enough
-> ("approved" in an escalated reply) that the proxy catches it, so *this instance*
-> does not by itself prove an LLM was needed. A **subtler** hallucination would slip
-> past the keywords and require `--live-judge`. See *What actually runs*, below.
+> ("approved") that the proxy catches it; **c8 is the honest counter-case** the proxy
+> misses, and switching on `--live-judge` (gemini-2.5-flash) flips c8 to FAIL. That
+> flip is the real proof an LLM-judge is needed. See *What actually runs*, below.
 
 ```
    dataset/cases.jsonl        traces/*.json          judge.py              results/
@@ -52,7 +54,7 @@ is at fault** (fault localization for free).
 | **Trajectory** | care (coordinator) | *did it get there the right way?* — route, slot-fill, **no self-decision** | deterministic checks over the trajectory |
 | **Outcome** | refund (worker) | *is the answer right?* — decision + the customer reply | golden match **+** LLM-as-judge |
 
-## Three detection mechanisms (the crown jewel)
+## Detection mechanisms (the crown jewel)
 
 A single worker needs **two layers of defense**, because its output has two
 shapes — a crisp label and free-form prose:
@@ -61,7 +63,8 @@ shapes — a crisp label and free-form prose:
 |------|-------|-----------|----------------|
 | **c5** | care | **trajectory** | care answered the refund itself and never delegated |
 | **c6** | refund | **golden set** (exact match) | `decision` ≠ the policy's right answer |
-| **c7** | refund | **LLM-as-judge** | `decision` is **correct**, but the reply promises an approval that never happened |
+| **c7** | refund | reply check — **blunt** hallucination | `decision` is **correct**, but the reply says *"approved"*; the keyword proxy already catches it |
+| **c8** | refund | reply check — **subtle** hallucination | `decision` correct; reply implies *"money's coming"* with no keyword — **only the live LLM-judge catches it** |
 
 *(c5 also shows FAIL on the outcome axis — a realistic **cascade**: because care
 never delegated, the worker was never invoked, so no decision exists to score.
@@ -99,6 +102,20 @@ why LLM-as-judge exists.
 > the judge's model, temperature, and rubric matter **only** on the free-text
 > column, and **only** when the real model is switched on.
 
+**The proof, actually run (c7 vs c8).** c7 is a *blunt* hallucination ("approved");
+c8 is a *subtle* one — *"your money will be back in your account within a few
+days"* — with no keyword to grep. Running both modes shows the flip:
+
+| Reply | Offline (keyword proxy) | Live (`--live-judge`, gemini-2.5-flash) |
+|-------|:-----------------------:|:---------------------------------------:|
+| **c7** blunt | FAIL ✅ (grep hits "approved") | FAIL ✅ |
+| **c8** subtle | **PASS ❌ (proxy blind)** | **FAIL ✅ (Gemini reasons it out)** |
+
+c8 flipping **PASS → FAIL** when the real model is switched on is the concrete,
+verified proof that an LLM-as-judge catches a class the golden set *and* a keyword
+proxy structurally cannot. (The default committed run is offline, so c8 shows the
+honest false-PASS; `--live-judge` reproduces the catch.)
+
 > **Why a judge can catch what the worker missed:** not "a bigger model," but
 > **verification is easier than generation** (grading < solving). The judge is
 > handed the reference, sees the full trajectory, and has a narrower job — so even
@@ -111,6 +128,34 @@ why LLM-as-judge exists.
 **Pass = the evaluator AGREES with what the agent did. Fail = disagreement.**
 Disagreement is exactly the **human-in-the-loop** trigger (a reviewer adjudicates,
 and the verdict becomes a new golden) — designed-for here, implemented next.
+
+## Two jobs — a pre-deploy gate, then a production flywheel
+
+The same loop earns its keep at **two points in the lifecycle** — this is what
+makes it a production capability, not a demo:
+
+1. **Regression gate (pre-deploy).** Wire `run_eval.py` into CI/CD: a failing axis
+   **blocks promotion** to production. The golden set becomes a hard gate, so a
+   regression can never ship.
+
+2. **Data flywheel (post-deploy).** Once live, **production traffic feeds the
+   loop**: capture real conversations + outcomes, let the two axes (and, on the
+   free-text column, the LLM-judge) surface failures, route disagreements to
+   **human-in-the-loop**, and fold each adjudicated case back in as a **new
+   golden**. The dataset grows from real usage → agents improve → production
+   improves → which yields more (and harder) cases. It compounds.
+
+```
+   production traffic ─▶ capture traces + outcomes ─▶ judge (2 axes)
+        ▲                                                  │ disagree
+        │                                                  ▼
+   better production ◀─ re-tune / redeploy ◀─ grow dataset ◀─ human-in-the-loop
+                                                (new golden)   (adjudicate)
+```
+
+The **gate** protects a release (backward-looking: don't regress); the
+**flywheel** compounds quality from real usage (forward-looking: keep improving).
+Same loop, two positions.
 
 ## Where the trajectory comes from (a deliberate clarification)
 
@@ -131,8 +176,8 @@ regenerating `traces/` from the real run — **the judge is unchanged**.
 
 ```
 eval/                          ← workspace-level: holistic, spans BOTH agents
-├── dataset/cases.jsonl        7 scenarios · input + golden (both agents' right answers per row)
-├── traces/c1..c7.json         recorded trajectories (record-then-replay)
+├── dataset/cases.jsonl        8 scenarios · input + golden (both agents' right answers per row)
+├── traces/c1..c8.json         recorded trajectories (record-then-replay)
 ├── judge.py                   judge_care (trajectory) · judge_refund (golden + LLM-judge)
 ├── run_eval.py                loop entry → 2 CSVs + summary
 └── results/*.csv              care_trajectory.csv · refund_outcome.csv
@@ -152,8 +197,9 @@ python3 run_eval.py --live-judge   # use Gemini as the reply judge (needs auth)
 
 ## Gaps (honest) — next steps
 
-- **Live judge & live traces** — swap recorded fixtures for a real
-  `care → A2A → refund` run; `--live-judge` already wires the Gemini path.
+- **Live traces** — `--live-judge` is **wired and verified** (gemini-2.5-flash,
+  caught c8 where the proxy missed); the remaining step is to swap recorded
+  fixtures for a real `care → A2A → refund` run so the *trajectories* are live too.
 - **Human-in-the-loop** — on `reply_agrees = disagree`, route to a reviewer;
   the adjudicated verdict becomes a new golden.
 - **Harder cases** — the current set is intentionally simple. High value: the

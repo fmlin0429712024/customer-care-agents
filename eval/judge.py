@@ -93,7 +93,7 @@ def _live_gemini_judge(reply, decision, case):
 
     client = genai.Client()
     prompt = JUDGE_PROMPT.format(decision=decision, chat=case["chat"], reply=reply)
-    resp = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+    resp = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
     text = (resp.text or "").strip()
     verdict = "AGREE" if text.upper().startswith("AGREE") else "DISAGREE"
     return verdict, text
