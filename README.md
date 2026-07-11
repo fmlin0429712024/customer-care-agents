@@ -1,19 +1,23 @@
 # Customer Care Multi-Agent System
 
 *An MVP two-agent solution (**Google ADK** + **A2A**) — prototyped as **Claude Code
-skills**, then run with a full **harness & governance** layer. Implemented two
-ways: **application-level** on Cloud Run, and **platform-managed** on Vertex
-Agent Engine.*
+skills**, run with a full **harness & governance** layer (built two ways:
+**application-level** on Cloud Run and **platform-managed** on Vertex Agent
+Engine), and proven with an **evaluation loop**.*
 
-> ## ▶ The point — one harness, built two ways
-> The core of this repo is a side-by-side of the **same** multi-agent harness &
-> governance, implemented two ways. Same agents, same policy — the only
-> difference is **who provides sessions, memory, tracing & governance**:
+> ## ▶ The point — the engineering lives in three deep dives
+> Beyond a working two-agent system, the parts an interviewer digs into are three
+> pages. Same agents, same policy throughout:
 >
+> **How you run it — the *same* harness, built two ways** (who provides sessions,
+> memory, tracing & governance):
 > ### ① [Application-level — on Cloud Run](docs/harness-cloud-run.md) → *you build the harness*
 > ### ② [Platform-managed — on Agent Engine](docs/harness-agent-platform.md) → *the platform provides it*
 >
-> **That comparison is the value. Everything below is the context that makes it land.**
+> **How you know it's correct — the evaluation loop:**
+> ### ③ [Evaluation loop & data flywheel](docs/eval-loop.md) → *golden set + LLM-as-judge; a pre-deploy regression gate that becomes a production flywheel*
+>
+> **These three are the value. Everything below is the context that makes them land.**
 
 An **agent system**, not a single agent: a conversational **coordinator** that
 takes the customer intake and, when the topic turns to a refund, delegates to an
