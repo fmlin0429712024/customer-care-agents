@@ -106,9 +106,6 @@ The same harness is implemented **two ways** — the core comparison of this rep
 | **1 · Application-level** | Cloud Run (bare compute) | **you build it** in the app | [**Harness & Governance — Cloud Run**](docs/harness-cloud-run.md) |
 | **2 · Platform-managed** | Vertex Agent Engine | **the platform provides it** — you configure | [**Harness & Governance — Agent Engine**](docs/harness-agent-platform.md) |
 
-Concepts behind it all (deployment-agnostic): [**Agent Engineering — First
-Principles & the 2026 Landscape**](docs/agent-first-principles.md).
-
 ---
 
 ## Run it locally (2 terminals)
