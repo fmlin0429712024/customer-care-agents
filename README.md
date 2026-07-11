@@ -5,6 +5,16 @@ skills**, then run with a full **harness & governance** layer. Implemented two
 ways: **application-level** on Cloud Run, and **platform-managed** on Vertex
 Agent Engine.*
 
+> ## ▶ The point — one harness, built two ways
+> The core of this repo is a side-by-side of the **same** multi-agent harness &
+> governance, implemented two ways. Same agents, same policy — the only
+> difference is **who provides sessions, memory, tracing & governance**:
+>
+> ### ① [Application-level — on Cloud Run](docs/harness-cloud-run.md) → *you build the harness*
+> ### ② [Platform-managed — on Agent Engine](docs/harness-agent-platform.md) → *the platform provides it*
+>
+> **That comparison is the value. Everything below is the context that makes it land.**
+
 ```
    You ──chat──▶  care_agent   (coordinator · intake · long, multi-turn · :8042)
                       │
@@ -108,16 +118,6 @@ cd customer-care-agent/adk_care
 .venv/bin/python m3_memory_demo.py       # memory: recall a returning customer ACROSS sessions
 .venv/bin/python session_state_demo.py   # state: slot-fill ACROSS turns, empty in a new session
 ```
-
-## Docs
-
-| Area | Doc |
-|------|-----|
-| **Concepts** | [Agent Engineering — First Principles & the 2026 Landscape](docs/agent-first-principles.md) |
-| **Run · Way 1** | [Harness & Governance — Cloud Run (application-level)](docs/harness-cloud-run.md) |
-| **Run · Way 2** | [Harness & Governance — Agent Engine (platform-managed)](docs/harness-agent-platform.md) |
-| Coordinator | [design](customer-care-agent/docs/01-coordinator-design.md) · [conversation eval](customer-care-agent/docs/02-conversation-eval.md) · [A2A local runbook](customer-care-agent/docs/03-a2a-local.md) |
-| Worker deep-dives | [tracing](refund-agent/adk_refund/docs/01-observability-tracing.md) · [PII guardrail](refund-agent/adk_refund/docs/02-governance-pii-guardrail.md) · [Cloud Run](refund-agent/adk_refund/docs/03-cloud-run-deployment.md) · [Firestore](refund-agent/adk_refund/docs/03.5-firestore-data-layer.md) · [eval](refund-agent/adk_refund/docs/04-evaluation-adk-eval.md) · [Agent Engine](refund-agent/adk_refund/docs/05-agent-engine-deployment.md) |
 
 ## Status
 
