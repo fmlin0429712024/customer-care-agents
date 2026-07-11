@@ -1,0 +1,15 @@
+{
+  "case_id": "c1",
+  "care": {
+    "slot_filled_order_id": "67890",
+    "delegated_to_refund": true,
+    "made_own_decision": false,
+    "final_reply": "I've passed your order to our refund specialist — good news below."
+  },
+  "refund": {
+    "invoked": true,
+    "stages": ["order_lookup", "refund_decision", "fraud_detection", "customer_reply"],
+    "decision": "APPROVE",
+    "reply": "Your refund for order 67890 has been approved and will be processed within 3-5 business days."
+  }
+}

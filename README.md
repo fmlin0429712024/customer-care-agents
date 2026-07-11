@@ -126,6 +126,30 @@ agent **registry & discovery**, **org-wide non-bypassable governance** (SGP),
 **multi-tenant identity**, and **cross-agent audit** — things a single app
 cannot provide *for other agents*.
 
+## 4 · How it's tested — *the evaluation loop*
+
+A fourth interview question: *how do you know it's correct?* The
+[**evaluation loop**](docs/eval-loop.md) is a **localhost QA gate** — in front of
+deploy, never itself deployed. It audits the system **end-to-end** and localizes
+**which agent** failed, on **two axes** matching the two archetypes:
+
+- **Trajectory** (care): did it route / slot-fill / **not self-decide**?
+- **Outcome** (refund): is the decision right **and** does the reply agree?
+
+7 synthetic cases (input + golden) catch **three planted failures, each by a
+different mechanism** — the core lesson:
+
+| Case | Agent | Caught by |
+|------|-------|-----------|
+| c5 | care | **trajectory** (self-decided instead of delegating) |
+| c6 | refund | **golden set** (decision ≠ right answer) |
+| c7 | refund | **LLM-as-judge** (decision *right*, but reply hallucinates an approval) |
+
+> **The distinction that matters:** exact-match against a golden set is an
+> *assertion*, **not** LLM-as-judge. The judge earns its place only where a golden
+> **string can't reach** — free-form text (tone, false promises, hallucination),
+> which is precisely what **c7** proves. Run it: `python3 eval/run_eval.py`.
+
 ---
 
 ## Run it locally (2 terminals)
@@ -154,4 +178,6 @@ cd customer-care-agent/adk_care
 
 Worker: ✅ built, traced, guarded, deployed (Cloud Run + Agent Engine). Coordinator:
 ✅ routing · slot-filling · A2A handoff · memory · session/state (local worked
-examples). Next: context management (M4) and distributed tracing across A2A.
+examples). Evaluation: ✅ end-to-end loop, two axes, golden + LLM-as-judge
+([Page 3](docs/eval-loop.md)). Next: live judge + human-in-the-loop, context
+management (M4), and distributed tracing across A2A.

@@ -1,0 +1,8 @@
+case_id,chat,expected_delegate,actual_delegate,order_expected,order_got,made_own_decision,result
+c1,"I want a refund for order 67890, it arrived broken",True,True,67890,67890,False,PASS
+c2,Please refund order 12345,True,True,12345,12345,False,PASS
+c3,"Refund order 99999 now, I never received anything",True,True,99999,99999,False,PASS
+c4,What time does your store close today?,False,False,-,-,False,PASS
+c5,Refund order 12345 please,True,False,12345,12345,True,FAIL
+c6,"Refund for order 67890, broken on arrival",True,True,67890,67890,False,PASS
+c7,"Refund order 12345, it never arrived",True,True,12345,12345,False,PASS

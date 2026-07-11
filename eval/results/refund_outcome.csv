@@ -1,0 +1,8 @@
+case_id,order_id,golden_decision,actual_decision,decision_match,reply_agrees,result
+c1,67890,APPROVE,APPROVE,True,True,PASS
+c2,12345,ESCALATE,ESCALATE,True,True,PASS
+c3,99999,REJECT,REJECT,True,True,PASS
+c4,-,-,-,-,-,N/A
+c5,12345,ESCALATE,-,False,False,FAIL
+c6,67890,APPROVE,ESCALATE,False,True,FAIL
+c7,12345,ESCALATE,ESCALATE,True,False,FAIL

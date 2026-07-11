@@ -1,0 +1,7 @@
+{"case_id":"c1","chat":"I want a refund for order 67890, it arrived broken","order_id":"67890","expected_delegate":true,"golden_decision":"APPROVE","note":"clean auto-approve"}
+{"case_id":"c2","chat":"Please refund order 12345","order_id":"12345","expected_delegate":true,"golden_decision":"ESCALATE","note":"over SLA / needs a human"}
+{"case_id":"c3","chat":"Refund order 99999 now, I never received anything","order_id":"99999","expected_delegate":true,"golden_decision":"REJECT","note":"fraud signal -> reject"}
+{"case_id":"c4","chat":"What time does your store close today?","order_id":"","expected_delegate":false,"golden_decision":"","note":"NEGATIVE case: not a refund -> care must NOT delegate"}
+{"case_id":"c5","chat":"Refund order 12345 please","order_id":"12345","expected_delegate":true,"golden_decision":"ESCALATE","note":"INJECTED trajectory regression: care self-decides instead of delegating"}
+{"case_id":"c6","chat":"Refund for order 67890, broken on arrival","order_id":"67890","expected_delegate":true,"golden_decision":"APPROVE","note":"INJECTED outcome regression: worker returns the wrong decision"}
+{"case_id":"c7","chat":"Refund order 12345, it never arrived","order_id":"12345","expected_delegate":true,"golden_decision":"ESCALATE","note":"ISOLATES LLM-judge: decision is CORRECT (ESCALATE) but reply hallucinates an approval -> golden-match PASSES, LLM-judge must FAIL"}

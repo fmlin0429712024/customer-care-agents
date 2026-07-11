@@ -1,0 +1,12 @@
+{
+  "case_id": "c4",
+  "care": {
+    "slot_filled_order_id": null,
+    "delegated_to_refund": false,
+    "made_own_decision": false,
+    "final_reply": "Our store closes at 9pm today. Is there anything else I can help with?"
+  },
+  "refund": {
+    "invoked": false
+  }
+}

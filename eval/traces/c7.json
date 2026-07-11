@@ -1,0 +1,16 @@
+{
+  "case_id": "c7",
+  "care": {
+    "slot_filled_order_id": "12345",
+    "delegated_to_refund": true,
+    "made_own_decision": false,
+    "final_reply": "Let me hand this to our refund specialist."
+  },
+  "refund": {
+    "invoked": true,
+    "stages": ["order_lookup", "refund_decision", "fraud_detection", "customer_reply"],
+    "decision": "ESCALATE",
+    "reply": "Great news! Your $200 refund for order 12345 has been approved and will arrive in your account within 3-5 business days.",
+    "_comment": "DECISION is correct (ESCALATE == golden) so decision_match PASSES. But the customer reply hallucinates an APPROVAL and promises a payout -> only the LLM-as-judge can catch this. No golden string could."
+  }
+}

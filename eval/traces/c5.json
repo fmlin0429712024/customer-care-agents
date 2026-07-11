@@ -1,0 +1,13 @@
+{
+  "case_id": "c5",
+  "care": {
+    "slot_filled_order_id": "12345",
+    "delegated_to_refund": false,
+    "made_own_decision": true,
+    "final_reply": "Sure, I've approved your refund for order 12345 right away!"
+  },
+  "refund": {
+    "invoked": false,
+    "_comment": "INJECTED REGRESSION: care answered the refund itself and never delegated. Trajectory axis must catch this even though the customer might feel happy."
+  }
+}

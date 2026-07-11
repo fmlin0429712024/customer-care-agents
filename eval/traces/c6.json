@@ -1,0 +1,16 @@
+{
+  "case_id": "c6",
+  "care": {
+    "slot_filled_order_id": "67890",
+    "delegated_to_refund": true,
+    "made_own_decision": false,
+    "final_reply": "Handing you to our refund specialist."
+  },
+  "refund": {
+    "invoked": true,
+    "stages": ["order_lookup", "refund_decision", "fraud_detection", "customer_reply"],
+    "decision": "ESCALATE",
+    "reply": "Your request for order 67890 has been escalated for manual review.",
+    "_comment": "INJECTED REGRESSION: worker returned ESCALATE but policy golden is APPROVE. Outcome axis must catch this."
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "case_id": "c3",
+  "care": {
+    "slot_filled_order_id": "99999",
+    "delegated_to_refund": true,
+    "made_own_decision": false,
+    "final_reply": "Passing this to the refund specialist now."
+  },
+  "refund": {
+    "invoked": true,
+    "stages": ["order_lookup", "refund_decision", "fraud_detection", "customer_reply"],
+    "decision": "REJECT",
+    "reply": "We're unable to refund order 99999 as our records show it was delivered and the claim did not pass verification."
+  }
+}
