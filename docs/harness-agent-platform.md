@@ -1,21 +1,30 @@
 # Platform-Managed Harness & Governance — Vertex Agent Engine
 
 *The platform provides the harness. Vertex Agent Engine (the managed agent tier
-of the Gemini Enterprise Agent Platform) supplies sessions, memory, tracing, and
-policy governance as **managed services** — so you **configure**, you don't
-re-code. The trade: it exists **only while running on the platform**.*
+of the Gemini Enterprise Agent Platform) supplies sessions, tracing, and — at the
+org tier — policy governance as **managed services**. You hand over the **agent +
+requirements**; the platform **builds the container** and runs it. The trade: the
+managed harness exists **only while running on the platform**.*
 
 This is **Way 2** of two. Contrast: [Way 1 — application-level on Cloud
 Run](harness-cloud-run.md).
 
+> **✅ Deployed & verified (us-central1):** the refund worker runs on Agent Engine.
+> - Reasoning Engine: `projects/51058313466/locations/us-central1/reasoningEngines/1925814957014777856`
+> - Verified via `stream_query`: order 67890 → full 4-stage pipeline → **APPROVE**.
+> - We shipped **no Dockerfile and no serve.py** — `adk deploy agent_engine`
+>   generated the container; the platform provides sessions + tracing.
+
 ```
-   ┌──────────────────────── Agent Engine (managed) ─────────────────────────┐
-   │  Managed Sessions · Memory Bank · Tracing · Policies/SGP · Registry      │
-   │  ┌────────────────┐   A2A/registry   ┌────────────────┐                  │
-   │  │  care agent    │◀────────────────▶│  refund agent  │                  │
-   │  └────────────────┘                  └────────────────┘                  │
-   │     you deploy the agent; the platform hangs the harness around it       │
-   └──────────────────────────────────────────────────────────────────────────┘
+   ┌──────────────── Vertex Agent Engine (managed runtime) ────────────────┐
+   │  Managed Sessions ·  Managed Tracing → Cloud Trace  ·  [Govern tabs]   │
+   │                                                                        │
+   │        ┌───────────────────────────────────────────────┐             │
+   │        │  refund_agent  (your agent + requirements.txt) │             │
+   │        │  platform-built container · 4-stage pipeline   │             │
+   │        └───────────────────────────────────────────────┘             │
+   │   you deploy the AGENT; the platform packs the box + hangs the harness │
+   └────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -23,62 +32,102 @@ Run](harness-cloud-run.md).
 ## The principle
 
 An **agent platform** is compute **plus** a managed harness. You deploy a
-structured ADK agent; the platform attaches sessions, memory, tracing, and
-governance **around** it — centrally, enforced, and audited across *every* agent.
-The cost: those controls are **not portable** — leave the platform and they're
-gone (that's Way 1's job).
+structured ADK agent (its code + `requirements.txt`); the platform **containerizes
+it for you** and attaches sessions, tracing, and — at the org tier — governance
+**around** it. The cost: those managed controls are **not portable** — leave the
+platform and they're gone (that's Way 1's job).
 
-## The app-code delta depends on the interface form
+## What actually happened (the deploy process)
 
-Moving a concern from app-level to platform-managed is **not** uniform. What
-changes in your code depends on how the concern is exposed:
+```bash
+# from refund-agent/adk_refund, using the venv that has the vertexai SDK
+adk deploy agent_engine \
+  --project=linkhealth-care-2024 --region=us-central1 \
+  --display_name="Refund Agent" --otel_to_cloud \
+  refund_agent
+```
 
-| Interface form | Concern | App-code delta when moving to platform |
-|----------------|---------|-----------------------------------------|
-| **Service reference** | Session/State, Memory | swap **one line**: `InMemory… → VertexAiSessionService / VertexAiMemoryBankService`; the tool + save/load wiring stays |
-| **Export pipe** | Observability | repoint the exporter, or drop it and let the platform auto-capture (a flag) |
-| **Injected logic** | Guardrail (PII) | **delete** the plugin; reconfigure as a platform **Policy / SGP** — the logic leaves your codebase |
+- `adk deploy agent_engine` reads `refund_agent/` (code + `requirements.txt` +
+  `.env`), **generates a Dockerfile**, builds the image, and registers a Reasoning
+  Engine. You write no container/serve code.
+- The managed runtime provides **Sessions** (used by `stream_query`) and, with
+  `--otel_to_cloud`, **tracing** to Cloud Trace.
 
-> Memory/state are the cleanest ("point the reference at the managed backend");
-> the guardrail is the one you can most fully **remove** from app code, because a
-> policy engine replaces it.
+**The gotcha that actually cost us (worth remembering):**
+
+> "Platform packs the container" ≠ "platform figures out your dependencies." The
+> deploy reported success, but the runtime **failed to start** — ADK 2.4.0's
+> `--otel_to_cloud` telemetry imports `opentelemetry-exporter-otlp-proto-http` at
+> startup, which wasn't in `requirements.txt`. **Lesson: never trust "deployed" —
+> drive a real query; on failure read the ReasoningEngine logs.** Fix: add the
+> OTLP/HTTP + Cloud Trace exporters to `refund_agent/requirements.txt`.
+
+Also: managed Sessions **reject API keys** — the agent must run in **Vertex mode**
+(`GOOGLE_GENAI_USE_VERTEXAI=TRUE`), auth via the runtime's service account (needs
+`roles/aiplatform.user` + `roles/datastore.user`).
 
 ## Per concern — what the platform manages
 
-| Concern | Layer | Platform service | App does |
-|---------|-------|------------------|----------|
-| **Sessions / State** | harness | managed Agent Engine Sessions (multi-day) | point at the service |
-| **Memory** | harness | **Memory Bank** — durable, cross-session, with automatic LLM extraction/consolidation | point at the service + keep the memory tool |
-| **Observability** | harness/gov | managed tracing, aggregated across agents | enable (config) |
-| **Guardrail / policy** | governance | **Policies** + runtime **SGP** (evaluates each tool call vs intent & org rules) | configure a policy |
-| **Discovery** | governance | **Agent Registry** — register, route, version | register the agent |
-| **Tool connectivity** | governance | **Gateways** — controlled agent↔tool egress | declare tools |
-| **Identity** | governance | IAM / service accounts, per-user (multi-tenant) | run under a service account |
+| Concern | Layer | Platform service | Status here |
+|---------|-------|------------------|-------------|
+| **Container / packaging** | ops | `adk deploy` generates the Dockerfile; platform builds it | ✅ verified |
+| **Sessions / State** | harness | managed Agent Engine Sessions | ✅ used by `stream_query` |
+| **Observability** | harness/gov | managed tracing → Cloud Trace (`--otel_to_cloud`) | ✅ enabled |
+| **Memory** | harness | **Memory Bank** — durable, cross-session, auto LLM extraction | ◻ not wired (gap) |
+| **Guardrail / policy** | governance | **Policies** + runtime **SGP** (evaluate tool calls vs org rules) | ◻ not set up (gap) |
+| **Discovery** | governance | **Agent Registry** — register, route, version | ◻ not registered (gap) |
+| **Identity** | governance | IAM / service accounts, per-user (multi-tenant) | ✅ runs under the RE service account |
 
-Status in this repo: the worker is **deployed to Agent Engine** ([doc
-05](../refund-agent/adk_refund/docs/05-agent-engine-deployment.md)); the managed
-memory/sessions/policy wiring is the platform-side counterpart to the local
-worked examples, configured rather than coded.
+## The app-code delta depends on the interface form
 
-## Why the platform, at scale
+Moving a concern from app-level to platform-managed is **not** uniform — it
+depends on how the concern is exposed:
 
-Two independent agents is manageable by hand (Way 1). At **many** agents,
-**many** users, and **compliance** obligations, the platform earns its place: it
-enforces governance **around** every agent (non-bypassable, audited), keys memory
-and identity **per tenant**, and provides **discovery** — things a single
-application cannot provide for *other* agents.
+| Interface form | Concern | App-code delta |
+|----------------|---------|----------------|
+| **Service reference** | Session/State, Memory | swap **one line**: `InMemory… → VertexAiSessionService / VertexAiMemoryBankService` |
+| **Export pipe** | Observability | a flag (`--otel_to_cloud`) — platform auto-captures; drop your OTel setup |
+| **Injected logic** | Guardrail (PII) | the app **plugin does not ride along** (the platform deploys the *agent*, not your `serve.py`); its platform form is a **Policy / SGP** you configure |
+
+> Note the guardrail point, learned concretely here: our Cloud Run guardrail was a
+> `serve.py` plugin. `adk deploy agent_engine` deploys the **agent**, so that
+> plugin isn't present on Agent Engine — the platform equivalent is a **Policy**,
+> which lives in the org/governance tier (below).
+
+## Gaps (honest) — what's *not* done on the platform
+
+- **Memory Bank** not wired — the managed memory backend isn't attached yet
+  (would be the `VertexAiMemoryBankService` reference).
+- **Governance tier** (Policies / SGP / Agent Registry / Gateways) is the
+  **console + Preview** layer of the Gemini Enterprise Agent Platform. It's
+  largely portal-driven today; setting it up via CLI/Terraform is limited, and it
+  postdates this author's knowledge cutoff — documented conceptually, not deployed.
+- **A2A between two Agent Engines** — only the **worker** is on Agent Engine; the
+  care coordinator is not (Way 2 is shown single-agent). Cross-engine A2A is the
+  managed-registry analogue of Page 1's two-container A2A.
+
+## Why the platform, at scale (the genuinely unique part)
+
+Two agents by hand is fine (Way 1). The platform earns its place at **many**
+agents, **many** users, **compliance**: it enforces governance **around** every
+agent (non-bypassable, audited), keys memory + identity **per tenant**, and
+provides **discovery** — things a single application **cannot provide for *other*
+agents**. Those cross-agent / org-scale features are the platform's true
+exclusives; single-agent harness (sessions, trace, guardrail, memory) an
+application can do just as well (Way 1), only with more manual wiring.
 
 ## Governance: placement, not a pipeline
 
-The same control can live in the app (Way 1) or on the platform (Way 2) — it's a
+The same control can live in the app (Way 1) or on the platform (Way 2) — a
 **placement** decision, not "app does / platform manages" (both *do*). When both
-are present they **stack**: the platform policy is a **floor** the agent cannot
-go below; the app may add **stricter** controls, never looser. Keep app-level for
+are present they **stack**: the platform policy is a **floor** the agent cannot go
+below; the app may add **stricter** controls, never looser. Keep app-level for
 **portability**; use platform-level for **org-wide enforcement**.
 
 ## Config-as-code
 
-Everything here is **API-first** — the console is a UI over the same APIs.
+The core platform is **API-first** — the console is a UI over the same APIs.
 Configure via the Vertex **Python SDK**, **gcloud**, or **Terraform**. Prefer
 **Terraform/IaC** for governance: declarative, version-controlled, auditable —
-which is itself good governance (and AI-assistable).
+itself good governance (and AI-assistable). The newest Preview governance features
+may lag on API/IaC coverage.

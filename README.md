@@ -99,12 +99,32 @@ which is exactly what makes the coordinator differ from the worker:
 > worker is short and stateless. That asymmetry *is* the coordinator-vs-worker
 > thesis, made concrete at the deployment layer.
 
-The same harness is implemented **two ways** — the core comparison of this repo:
+The same harness is implemented **two ways** — the core of this repo, both
+**deployed & verified**:
 
-| Way | Substrate | Who provides the harness | Doc |
-|-----|-----------|--------------------------|-----|
-| **1 · Application-level** | Cloud Run (bare compute) | **you build it** in the app | [**Harness & Governance — Cloud Run**](docs/harness-cloud-run.md) |
-| **2 · Platform-managed** | Vertex Agent Engine | **the platform provides it** — you configure | [**Harness & Governance — Agent Engine**](docs/harness-agent-platform.md) |
+| Way | Substrate | Who provides the harness | Status | Doc |
+|-----|-----------|--------------------------|--------|-----|
+| **1 · Application-level** | Cloud Run (bare compute) | **you build it** in the app | ✅ 2 services, real A2A/HTTPS | [Cloud Run](docs/harness-cloud-run.md) |
+| **2 · Platform-managed** | Vertex Agent Engine | **the platform provides it** | ✅ `stream_query` verified | [Agent Engine](docs/harness-agent-platform.md) |
+
+**Same worker, two ways — who does the work:**
+
+| Concern | Way 1 · application-level | Way 2 · platform-managed |
+|---------|--------------------------|--------------------------|
+| **Container** | you write the `Dockerfile` | `adk deploy` generates it |
+| **Serve entry** | you write `serve.py` / `a2a_server.py` | platform runtime |
+| **Sessions** | you wire a `SessionService` | managed (automatic) |
+| **Tracing** | you set up the OTel exporter | a flag (`--otel_to_cloud`) |
+| **Guardrail (PII)** | a plugin on your Runner | a platform **Policy** (org tier) |
+| **Portability** | runs anywhere (localhost, any cloud) | only on the platform |
+
+**Are there platform-only features?** For **single-agent** harness (sessions,
+trace, guardrail, memory) the answer is *no* — the application can do everything
+the platform does, just with more manual wiring (Way 1 is the more fundamental
+layer). The platform's genuine exclusives are all **cross-agent / org-scale**:
+agent **registry & discovery**, **org-wide non-bypassable governance** (SGP),
+**multi-tenant identity**, and **cross-agent audit** — things a single app
+cannot provide *for other agents*.
 
 ---
 
