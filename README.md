@@ -1,18 +1,26 @@
 # Customer Care Multi-Agent System
 
-A two-agent customer-service system built with **Google ADK** and **A2A**: a
-conversational **coordinator** takes the customer intake and, when the topic turns
-to a refund, delegates to an independent **specialist worker** over A2A. Both
-agents were prototyped as **Claude Code skills** and migrated **verbatim** into
-ADK — policy is authored once, never rewritten in Python.
+A two-agent customer-service system built with **Google ADK** and **A2A**. A
+conversational coordinator handles the customer; when the topic turns to a refund,
+it delegates to an independent specialist worker.
 
-The engineering worth reviewing is three deep-dive pages, reached from the
-sections below:
+## 1. What's in this project
 
-- **How you run it — the same harness, built two ways:** ① [Application-level · Cloud Run](docs/harness-cloud-run.md) · ② [Platform-managed · Agent Engine](docs/harness-agent-platform.md)
-- **How you know it's correct:** ③ [The evaluation loop](docs/eval-loop.md)
+Three pieces of engineering, each with its own deep-dive page:
 
-## 1. What it does
+1. **Application-level harness** — [Cloud Run](docs/harness-cloud-run.md): the app
+   builds its own harness (sessions, memory, tracing, PII guardrails).
+2. **Platform-level harness** — [Agent Engine](docs/harness-agent-platform.md): the
+   platform provides that same harness.
+3. **Evaluation loop** — [Page 3](docs/eval-loop.md): how you know the system is
+   correct (golden checks + LLM-as-judge; a release gate and a data flywheel).
+
+Items 1 and 2 are the **same harness built two ways** — that comparison is the core
+of the repo.
+
+## 2. Architecture
+
+Two agents, each deployable as its own container, talking over A2A:
 
 ```mermaid
 flowchart TB
@@ -35,36 +43,21 @@ flowchart TB
     linkStyle 4 stroke:#d81b60,stroke-width:3px
 ```
 
-The coordinator owns the long conversation (intent, slot-filling, customer
-context). The worker is a stateless four-stage `SequentialAgent`. The **A2A hop**
-(bold) is a frozen interface: the coordinator sends an `order_id`, the worker
-returns a decision, and the pipeline stays hidden behind it.
-
 | Agent | Role | Session shape | Job |
 |-------|------|---------------|-----|
-| [`customer-care-agent/`](customer-care-agent/) | **coordinator** · intake | long, multi-turn | greet, classify intent, slot-fill, **delegate** refunds |
-| [`refund-agent/`](refund-agent/) | **worker** · specialist | short, one-shot | `order_lookup → refund_decision → fraud_detection → customer_reply` |
+| [`customer-care-agent/`](customer-care-agent/) | coordinator · intake | long, multi-turn | greet, classify intent, slot-fill, **delegate** refunds |
+| [`refund-agent/`](refund-agent/) | worker · specialist | short, one-shot | `order_lookup → refund_decision → fraud_detection → customer_reply` |
 
-- **A2A is the integration, not glue.** The coordinator sees the worker as a black
-  box behind an Agent Card. The two agents deploy, scale, and version independently.
+- **A2A is a frozen interface.** The coordinator sends an `order_id` and gets back a
+  decision; the worker is a black box behind an Agent Card, versioned and scaled on
+  its own.
 - **The coordinator never decides refunds.** Policy (approve / escalate / reject,
-  fraud rules, SLA) lives in the worker; the coordinator owns routing and conversation.
+  fraud rules, SLA) lives in the worker.
+- **Authored once.** Each agent's policy is a Claude Code `SKILL.md` copied
+  byte-identical into ADK; Python holds only host wiring (tools, memory, the A2A
+  hookup) — never business logic.
 
-## 2. How it's built — Claude Code skills → ADK
-
-```
-   Claude Code SKILL.md  ──(byte-identical copy)──▶  ADK agent instruction
-      (rapid authoring)                                 (production runtime)
-```
-
-- **Policy lives in `SKILL.md`** and is copied byte-identical into the ADK agent.
-  Business logic is never re-authored in Python.
-- Only the **host wiring** differs per environment — tools, `output_key`, memory,
-  the A2A hookup — and lives in `agent.py`, never in the skill.
-- The same policy runs in the Claude Code playground (design) and on ADK
-  (production), so the migration path is a copy, not a rewrite.
-
-## 3. How it runs — harness & governance
+## 3. Harness & governance — built two ways
 
 **Harness** is the runtime scaffolding (sessions, state, memory, tools, tracing);
 **governance** is the controls (PII guardrails, policies, audit, identity). These
@@ -79,11 +72,10 @@ makes the coordinator differ from the worker:
 | Session / state (slot-filling) | ✅ heavy | ◐ minimal | service ref |
 
 The read-off: **memory and heavy state land on the coordinator only** — the worker
-is short and stateless. That asymmetry *is* the coordinator-vs-worker split, made
-concrete at the deployment layer.
+is short and stateless.
 
-That same harness — same policy — is then built **two ways**. Both are **deployed
-and verified**; the two pages are the deep dive:
+That same harness is then built **two ways**. Both are **deployed and verified**;
+the two pages are the deep dive:
 
 | | ① [**Cloud Run**](docs/harness-cloud-run.md) (application-level) | ② [**Agent Engine**](docs/harness-agent-platform.md) (platform-managed) |
 |---|---|---|
@@ -95,21 +87,21 @@ and verified**; the two pages are the deep dive:
 For a **single agent**, the app can do everything the platform does — Cloud Run is
 the more fundamental layer. The platform's real exclusives are all **cross-agent /
 org-scale**: registry and discovery, org-wide non-bypassable governance,
-multi-tenant identity, cross-agent audit — things one app cannot provide *for
-other agents*.
+multi-tenant identity, cross-agent audit — things one app cannot provide *for other
+agents*.
 
-## 4. How it's tested — the evaluation loop
+## 4. The evaluation loop
 
-*How do you know it's correct?* The [**evaluation loop**](docs/eval-loop.md) is a
-localhost QA gate that runs end-to-end across both agents and pinpoints **which
-agent** failed, on **two axes**: **trajectory** (care — did it route without
-self-deciding?) and **outcome** (refund — the right decision *and* an honest reply?).
+The [**evaluation loop**](docs/eval-loop.md) runs on localhost, end-to-end across
+both agents, and pinpoints **which agent** failed on **two axes**: **trajectory**
+(care — did it route without self-deciding?) and **outcome** (refund — the right
+decision *and* an honest reply?).
 
 The idea worth the click: **a golden-set match is an assertion, not a judge.** An
 **LLM-as-judge** is needed only where free text can hallucinate — a reply that
 promises an approval the customer never got. The suite proves it: one case flips
-**PASS → FAIL** only once the real model (`gemini-2.5-flash`) is switched on, catching
-what the offline check misses.
+**PASS → FAIL** only once the real model (`gemini-2.5-flash`) is switched on,
+catching what the offline check misses.
 
 The loop has **two jobs**: a pre-deploy **regression gate** and a post-deploy
 **data flywheel** (real traffic → human-in-the-loop → new golden → better agents).
