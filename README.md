@@ -107,16 +107,7 @@ catching what the offline check misses.
 The loop has **two jobs**: a pre-deploy **regression gate** and a post-deploy
 **data flywheel** (real traffic → human-in-the-loop → new golden → better agents).
 
-## 5. Repository map
-
-```text
-customer-care-agent/   coordinator: conversation, state, memory, A2A client
-refund-agent/          specialist worker: policy, fraud screening, A2A server
-docs/                  the three deep dives + deployment notes
-eval/                  end-to-end dataset, trajectories, judge, results
-```
-
-## 6. Run locally
+## 5. Run locally
 
 ```bash
 # terminal 1 — refund A2A server (start first; care needs its Agent Card)
@@ -136,7 +127,7 @@ call. The evaluation suite runs standalone:
 python3 eval/run_eval.py            # offline; add --live-judge for the real model
 ```
 
-## 7. Status
+## 6. Status
 
 Worker: ✅ built, traced, guarded, deployed (Cloud Run + Agent Engine).
 Coordinator: ✅ routing · slot-filling · A2A handoff · memory · session/state.
