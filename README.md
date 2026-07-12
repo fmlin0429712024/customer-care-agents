@@ -8,12 +8,11 @@ it delegates to an independent specialist worker.
 
 Three pieces of engineering, each with its own deep-dive page:
 
-1. **Application-level harness** — [Cloud Run](docs/harness-cloud-run.md): the app
-   builds its own harness (sessions, memory, tracing, PII guardrails).
-2. **Platform-level harness** — [Agent Engine](docs/harness-agent-platform.md): the
-   platform provides that same harness.
-3. **Evaluation loop** — [Page 3](docs/eval-loop.md): how you know the system is
-   correct (golden checks + LLM-as-judge; a release gate and a data flywheel).
+| # | Content | What it is |
+|---|---------|------------|
+| 1 | [**Application-level harness — Cloud Run**](docs/harness-cloud-run.md) | the app builds its own harness (sessions, memory, tracing, PII guardrails) |
+| 2 | [**Platform-level harness — Agent Engine**](docs/harness-agent-platform.md) | the platform provides that same harness |
+| 3 | [**Evaluation loop**](docs/eval-loop.md) | how you know the system is correct (golden checks + LLM-as-judge; a release gate and a data flywheel) |
 
 Items 1 and 2 are the **same harness built two ways** — that comparison is the core
 of the repo.
@@ -43,10 +42,12 @@ flowchart TB
     linkStyle 4 stroke:#d81b60,stroke-width:3px
 ```
 
-| Agent | Role | Session shape | Job |
-|-------|------|---------------|-----|
-| [`customer-care-agent/`](customer-care-agent/) | coordinator · intake | long, multi-turn | greet, classify intent, slot-fill, **delegate** refunds |
-| [`refund-agent/`](refund-agent/) | worker · specialist | short, one-shot | `order_lookup → refund_decision → fraud_detection → customer_reply` |
+- [`customer-care-agent/`](customer-care-agent/) — **coordinator / intake**; long,
+  multi-turn. Greets, classifies intent, slot-fills, and **delegates** refunds.
+- [`refund-agent/`](refund-agent/) — **worker / specialist**; short, one-shot. Runs
+  `order_lookup → refund_decision → fraud_detection → customer_reply`.
+
+Key properties:
 
 - **A2A is a frozen interface.** The coordinator sends an `order_id` and gets back a
   decision; the worker is a black box behind an Agent Card, versioned and scaled on
