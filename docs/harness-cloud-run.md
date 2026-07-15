@@ -56,6 +56,51 @@ end-to-end operating model.
 Two agents = **two independent services** = **real A2A** over the network (not an
 in-process call). Each is its own container with its own harness.
 
+## Vibe-Coding Build Contract — Composable Runtime
+
+Before asking a coding agent to generate ADK code, define the operating contract.
+The existing `SKILL.md` files remain the source of domain and workflow knowledge;
+the generated Python supplies the ADK runtime envelope around them.
+
+| Concern | Decision the team must make |
+| --- | --- |
+| Agent shape | Which agents are short/stateless workers versus long-running coordinators? |
+| Session / state | Which durable backend stores session events and business state? Define state keys, retention, and tenant scope. |
+| Memory | Is cross-session memory needed? If yes, choose a retrieval/memory backend and define what may be written or retrieved. |
+| Context | Which recent turns, summaries, state, retrieved memory, and tool results enter each model call? |
+| Guardrails | What must be redacted, blocked, validated, or human-approved before model/tool actions? |
+| Observability | Which trace backend, span fields, redaction rules, alerts, and evaluation signals are required? |
+| Identity | Which service account, user/tenant identity, secret source, and tool permissions apply? |
+
+### Prompt Template
+
+```text
+Build a production-oriented ADK application for deployment on Cloud Run.
+
+1. Reuse the existing SKILL.md directories as the domain/workflow source of truth;
+   load them through an ADK-compatible SkillToolset. Do not rewrite business policy.
+2. Generate agent.py, tools.py, callbacks/guardrails.py, serve.py, Dockerfile,
+   requirements, tests, and deployment configuration.
+3. Implement these agent roles: [COORDINATOR / STATELESS WORKER].
+4. Configure session/state through [SESSION BACKEND]. Persist only these state keys:
+   [STATE KEYS]. Define retention and tenant/user scope.
+5. Configure cross-session memory: [NONE / MEMORY BACKEND]. Allow only these memory
+   categories: [ALLOWED MEMORY]. Retrieve memory only for [RETRIEVAL CONDITIONS].
+6. Implement context strategy: recent history [N turns], older-history summarization
+   [RULE], retrieved memory [RULE], tool-result inclusion [RULE].
+7. Implement application-level guardrails: [PII/PHI redaction, tool allow-list,
+   output validation, approval gates]. Do not place secrets in source code.
+8. Export OpenTelemetry traces to [TRACE BACKEND], with sensitive fields redacted.
+9. Use least-privilege IAM via [SERVICE ACCOUNT] and externalize all resource IDs
+   and secrets as configuration.
+10. Add unit, integration, and evaluation tests. A failed evaluation must block
+    promotion. Produce a concise architecture README and list all assumptions.
+```
+
+Replace bracketed values with the client-specific decisions. Code generation can
+scaffold the implementation; the engineering team must review service boundaries,
+IAM, data handling, tool permissions, and evaluation evidence before deployment.
+
 ## One serve entry wires the whole harness
 
 The load-bearing idea: each agent has a single **serve entry** that assembles the

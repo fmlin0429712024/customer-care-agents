@@ -38,6 +38,51 @@ it for you** and attaches sessions, tracing, and — at the org tier — governa
 **around** it. The cost: those managed controls are **not portable** — leave the
 platform and they're gone (that's Way 1's job).
 
+## Vibe-Coding Build Contract — Integrated Agent Platform
+
+The application still owns agent behavior, Skills, state semantics, context
+strategy, and domain-specific controls. The prompt changes the service bindings:
+use the platform's managed runtime, sessions, memory, trace, policy, identity, and
+registry capabilities where they meet the client requirements.
+
+| Concern | Decision the team must make |
+| --- | --- |
+| Agent shape | Which agents need managed runtime, durable sessions, memory, or registry discovery? |
+| Sessions / memory | Which platform services are enabled, what is the tenant scope, retention, and allowed memory content? |
+| Context | What should the agent retrieve, summarize, and include per model call? Platform storage does not replace context strategy. |
+| Policy | Which organization-wide tool/data policies form the non-bypassable baseline? |
+| App guardrails | Which domain-specific controls must remain in the agent application as defense in depth? |
+| Identity | Which service accounts, user identities, data entitlements, and audit scopes apply? |
+| Evaluation | Which datasets, release gates, human-review queues, and production feedback signals are required? |
+
+### Prompt Template
+
+```text
+Build a production-oriented ADK application for deployment on [AGENT PLATFORM].
+
+1. Reuse the existing SKILL.md directories as the domain/workflow source of truth;
+   load them through an ADK-compatible SkillToolset. Do not rewrite business policy.
+2. Generate agent.py, tools.py, tests, platform deployment configuration, and an
+   architecture README. Use the platform's managed agent runtime.
+3. Implement these agent roles: [COORDINATOR / STATELESS WORKER].
+4. Bind ADK to platform-managed [SESSIONS] and [MEMORY]. Define state keys,
+   tenant/user scope, retention, and allowed memory categories.
+5. Implement context strategy: recent history [N turns], older-history summarization
+   [RULE], memory retrieval [RULE], and tool-result inclusion [RULE].
+6. Configure platform policy for [TOOL GOVERNANCE / DATA ACCESS / APPROVALS], and
+   add application-level guardrails for [DOMAIN-SPECIFIC CONTROLS].
+7. Enable platform tracing and logging with sensitive data redaction. Configure
+   least-privilege IAM, service identity, and data entitlements.
+8. Register/version the agent if the platform supports a registry. Add unit,
+   integration, and evaluation tests; failed evaluations block promotion.
+9. Produce a concise list of platform-managed versus application-managed concerns,
+   plus all assumptions and unresolved governance decisions.
+```
+
+The platform reduces operational wiring; it does not decide what state means, what
+memory is allowed, what context is relevant, or when a human must approve an
+action.
+
 ## What actually happened (the deploy process)
 
 ```bash
