@@ -62,13 +62,38 @@ Key properties:
 
 ## 3. Runtime Mental Model
 
-| Category | Purpose | Examples |
-|---|---|---|
-| **Business workflow** | Delivers the domain outcome | Skills, tools, routing, A2A delegation, refund decision |
-| **Inline runtime controls** | Run synchronously *inside every agent invocation* | Load minimal state/context, guardrail before model/tool action, trace emission, write state/event |
-| **Asynchronous operating workflows** | Improve or operate the system *outside the live request* | Evaluation → HITL → golden set → PR/CI/CD; monitoring → incident; session history → summary/memory extraction |
+### Live request path — synchronous
 
-**Key distinction:** inline controls are not a separate business workflow; they wrap the live agent loop. Every agent needs minimal context, guardrails, and tracing. A conversational coordinator additionally needs durable session history, summarization, and long-term memory; a short worker may need only task state.
+These concerns are independently implemented but run with the customer's live
+request. They are **not** separate business workflows.
+
+| Concern | Use case | Where / how it is set up |
+|---|---|---|
+| **Business workflow** | Deliver the domain result | Skills, tools, routing, A2A delegation, refund decision |
+| **Session history** | Continue one conversation across turns | `SessionService` + session/user IDs; durable backend and retention for production |
+| **State** | Share structured task data between turns or agents | Agent outputs / `ToolContext.state`; define schema, scope, update, and expiry |
+| **Context assembly** | Give the model only the relevant information for this turn | Application strategy selects current input, state, recent history, summaries, and approved retrieval results |
+| **Memory retrieval** | Recall approved facts from a prior session | `MemoryService` / retrieval tool, invoked when the current question needs it |
+| **Guardrails** | Block, redact, validate, or require approval before a model/tool action | ADK Runner plugin/callback and, for high-risk actions, tool-level authorization or HITL |
+| **Trace capture** | Record what this live execution did | ADK/OpenTelemetry instrumentation emits spans during the request; configure the provider at application startup |
+
+**Worker versus coordinator:** a short worker often needs only task state and
+tracing. A conversational coordinator also needs durable session history,
+context selection, and (when useful) cross-session memory.
+
+### Out-of-band operating workflows — asynchronous
+
+| Workflow | Trigger / purpose | Output |
+|---|---|---|
+| **Trace export and monitoring** | Trace spans are captured inline; exporters usually batch-send them later | Cloud Trace / LangSmith data → anomaly investigation or incident workflow |
+| **Memory curation** | Session close, timeout, or policy trigger | Summarize/extract approved durable facts from history → cross-session memory |
+| **Evaluation and improvement** | CI/CD gate or sampled production outcomes; never blocks a live customer request | Eval → HITL adjudication → golden set → controlled PR / release |
+
+**The key distinction:** guardrails **control** the live flow and must finish
+before an action. Tracing **records** the live flow; its export can be
+asynchronous. Context assembly is always a live application responsibility:
+platforms provide storage and services, but do not decide what information is
+relevant for a model call.
 
 ## 4. Harness & governance — built two ways
 
