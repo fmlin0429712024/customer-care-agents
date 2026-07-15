@@ -1,4 +1,4 @@
-# Agentic AI POC — Customer Care Operations
+# Agentic AI POC — Customer Care Operations & Harness Governance
 
 A two-agent customer-service system built with **Google ADK** and **A2A**. A
 conversational coordinator handles the customer; when the topic turns to a refund,
