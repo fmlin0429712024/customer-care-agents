@@ -1,10 +1,11 @@
 # Platform-Managed Harness & Governance — Vertex Agent Engine
 
-*The platform provides the harness. Vertex Agent Engine (the managed agent tier
-of the Gemini Enterprise Agent Platform) supplies sessions, tracing, and — at the
-org tier — policy governance as **managed services**. You hand over the **agent +
-requirements**; the platform **builds the container** and runs it. The trade: the
-managed harness exists **only while running on the platform**.*
+*The platform provides an integrated harness. Vertex Agent Engine (the managed
+agent tier of the Gemini Enterprise Agent Platform) supplies sessions, tracing,
+and — at the org tier — policy governance as **managed services**. You hand over
+the **agent + requirements**; the platform **builds the container** and runs it.
+The trade: managed does not mean zero configuration, and the integrated controls
+exist only while running on the platform.*
 
 This is **Way 2** of two. Contrast: [Way 1 — application-level on Cloud
 Run](harness-cloud-run.md).

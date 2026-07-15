@@ -10,12 +10,14 @@ Three pieces of engineering, each with its own deep-dive page:
 
 | # | Content | What it is |
 |---|---------|------------|
-| 1 | [**Application-level harness — Cloud Run**](docs/harness-cloud-run.md) | Cloud Run gives **only cloud scaling** — no harness or governance built in — so the **app builds its own** (sessions, memory, tracing, PII guardrails) |
+| 0 | [**Harness operating models**](docs/harness-operating-models.md) | Architecture decision guide: **composable runtime** versus **integrated agent platform** |
+| 1 | [**Application-level harness — Cloud Run**](docs/harness-cloud-run.md) | Cloud Run gives **only cloud scaling** — the app **composes** sessions, memory, tracing, and PII guardrails from code plus external managed services |
 | 2 | [**Platform-level harness — Agent Engine**](docs/harness-agent-platform.md) | Vertex Agent Engine (the **Gemini Enterprise Agent Platform**) **includes the harness and governance** — managed sessions, tracing, and org-scale policy |
 | 3 | [**Evaluation loop**](docs/eval-loop.md) | how you know the system is correct (golden checks + LLM-as-judge; a release gate and a data flywheel) |
 
-Items 1 and 2 are the **same harness built two ways** — that comparison is the core
-of the repo.
+Items 1 and 2 are the **same agent logic operated two ways** — see the
+[operating-model decision guide](docs/harness-operating-models.md) for the shared
+responsibilities and trade-offs.
 
 ## 2. Architecture
 

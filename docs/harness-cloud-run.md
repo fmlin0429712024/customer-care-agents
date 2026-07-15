@@ -1,9 +1,9 @@
 # Application-Level Harness & Governance — Cloud Run
 
-*You build the harness. Cloud Run gives you **bare compute** (a container that
-scales) and **nothing agent-specific** — so observability, guardrails, sessions,
-memory and state are all wired **in the application**, and travel with the agent
-wherever it runs.*
+*You compose the harness. Cloud Run gives you **bare compute** (a container that
+scales) and nothing agent-specific. The application wires observability,
+guardrails, sessions, memory, and state through ADK plus external managed services.
+The agent remains portable; the application team owns the composition.*
 
 This is **Way 1** of two. Contrast: [Way 2 — platform-managed on Agent
 Engine](harness-agent-platform.md).
@@ -48,9 +48,10 @@ an in-process call). Each service brings its own harness above the bare compute.
 
 Cloud Run is a **substrate**, not an agent platform: it runs your container and
 autoscales it — that's all. Every cross-cutting concern is therefore
-**application-level** — it lives in your code, is deployed *with* the agent, and
-**protects the agent everywhere** (localhost, another cloud, on-prem). The cost:
-**you** own the wiring, the correctness, and the persistence.
+**application-level** — its behavior lives in your code, while durable storage,
+tracing, and other backends can be independent managed services. The agent can run
+anywhere; the cost is that **you** own the wiring, correctness, persistence, and
+end-to-end operating model.
 
 Two agents = **two independent services** = **real A2A** over the network (not an
 in-process call). Each is its own container with its own harness.
