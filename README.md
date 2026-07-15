@@ -60,7 +60,17 @@ Key properties:
   byte-identical into ADK; Python holds only host wiring (tools, memory, the A2A
   hookup) — never business logic.
 
-## 3. Harness & governance — built two ways
+## 3. Runtime Mental Model
+
+| Category | Purpose | Examples |
+|---|---|---|
+| **Business workflow** | Delivers the domain outcome | Skills, tools, routing, A2A delegation, refund decision |
+| **Inline runtime controls** | Run synchronously *inside every agent invocation* | Load minimal state/context, guardrail before model/tool action, trace emission, write state/event |
+| **Asynchronous operating workflows** | Improve or operate the system *outside the live request* | Evaluation → HITL → golden set → PR/CI/CD; monitoring → incident; session history → summary/memory extraction |
+
+**Key distinction:** inline controls are not a separate business workflow; they wrap the live agent loop. Every agent needs minimal context, guardrails, and tracing. A conversational coordinator additionally needs durable session history, summarization, and long-term memory; a short worker may need only task state.
+
+## 4. Harness & governance — built two ways
 
 **Harness** is the runtime scaffolding (sessions, state, memory, tools, tracing);
 **governance** is the controls (PII guardrails, policies, audit, identity). These
@@ -93,7 +103,7 @@ org-scale**: registry and discovery, org-wide non-bypassable governance,
 multi-tenant identity, cross-agent audit — things one app cannot provide *for other
 agents*.
 
-## 4. The evaluation loop
+## 5. The evaluation loop
 
 The [**evaluation loop**](docs/eval-loop.md) runs on localhost, end-to-end across
 both agents, and pinpoints **which agent** failed on **two axes**: **trajectory**
@@ -109,7 +119,7 @@ catching what the offline check misses.
 The loop has **two jobs**: a pre-deploy **regression gate** and a post-deploy
 **data flywheel** (real traffic → human-in-the-loop → new golden → better agents).
 
-## 5. Run locally
+## 6. Run locally
 
 ```bash
 # terminal 1 — refund A2A server (start first; care needs its Agent Card)
@@ -129,7 +139,7 @@ call. The evaluation suite runs standalone:
 python3 eval/run_eval.py            # offline; add --live-judge for the real model
 ```
 
-## 6. Status
+## 7. Status
 
 Worker: ✅ built, traced, guarded, deployed (Cloud Run + Agent Engine).
 Coordinator: ✅ routing · slot-filling · A2A handoff · memory · session/state.
