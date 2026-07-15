@@ -14,14 +14,18 @@ flowchart TB
     subgraph CR["Composable runtime: Cloud Run + ADK"]
         direction TB
         APP["Cloud Run container<br/>ADK agent + application harness"]
+        CG["Application guardrails<br/>model/tool hooks · PII/PHI redaction<br/>approval gates"]
         EXT["External managed services<br/>durable sessions/state · memory/retrieval<br/>tracing · secrets · IAM"]
+        CG -->|"wraps"| APP
         APP <-->|"SDK / API + identity"| EXT
     end
 
     subgraph AP["Integrated agent platform"]
         direction TB
         PA["Managed agent runtime"]
-        PC["Integrated control plane<br/>sessions · memory · tracing · policy<br/>identity · registry / discovery"]
+        PG["Platform policy / gateway<br/>organization-wide guardrails<br/>tool governance · approval controls"]
+        PC["Integrated control plane<br/>sessions · memory · tracing<br/>identity · registry / discovery"]
+        PG -->|"enforces"| PA
         PA <--> PC
     end
 ```
@@ -39,6 +43,12 @@ This does **not** mean self-hosting every capability. The services are normally 
 An agent platform productizes much of that composition as a unified control plane. It can provide a managed runtime, sessions, memory, tracing, policy enforcement, identity, and agent discovery. This reduces operational wiring and improves organization-wide consistency.
 
 Managed does **not** mean zero configuration. The team still configures resource scope, IAM, retention, policy, evaluation, data access, and the application's context strategy.
+
+## Guardrail Placement
+
+In a composable runtime, application-level guardrails wrap model and tool calls. Examples include PII/PHI redaction, tool allow-lists, output validation, and human-approval gates. The application team owns their implementation and makes sure every serve entry attaches them.
+
+In an integrated platform, policy or gateway controls can establish an organization-wide, non-bypassable baseline across agents. The strongest design uses **defense in depth**: platform policy provides the floor, while application guardrails add domain-specific controls that can be stricter but never weaker.
 
 ## Decision Guide
 
