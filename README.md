@@ -6,7 +6,7 @@ it delegates to an independent specialist worker.
 
 ## 1. What's in this project
 
-Three pieces of engineering, each with its own deep-dive page:
+Five pieces of engineering, each with its own deep-dive page:
 
 | # | Content | What it is |
 |---|---------|------------|
@@ -14,6 +14,7 @@ Three pieces of engineering, each with its own deep-dive page:
 | 1 | [**Application-level harness — Cloud Run**](docs/harness-cloud-run.md) | Cloud Run gives **only cloud scaling** — the app **composes** sessions, memory, tracing, and PII guardrails from code plus external managed services |
 | 2 | [**Platform-level harness — Agent Engine**](docs/harness-agent-platform.md) | Vertex Agent Engine (the **Gemini Enterprise Agent Platform**) **includes the harness and governance** — managed sessions, tracing, and org-scale policy |
 | 3 | [**Evaluation loop**](docs/eval-loop.md) | how you know the system is correct (golden checks + LLM-as-judge; a release gate and a data flywheel) |
+| 4 | [**Tool and approval boundaries**](docs/tool-boundary-runnable-proof-reference.md) | a local, tested proof that a controlled refund action cannot bypass approval or duplicate protection |
 
 Items 1 and 2 are the **same agent logic operated two ways** — see the
 [operating-model decision guide](docs/harness-operating-models.md) for the shared
@@ -56,11 +57,43 @@ Key properties:
   its own.
 - **The coordinator never decides refunds.** Policy (approve / escalate / reject,
   fraud rules, SLA) lives in the worker.
-- **Authored once.** Each agent's policy is a Claude Code `SKILL.md` copied
-  byte-identical into ADK; Python holds only host wiring (tools, memory, the A2A
-  hookup) — never business logic.
+- **Authored once.** The current prototype's agent policy is a Claude Code
+  `SKILL.md` copied byte-identical into ADK; Python provides its host wiring
+  (tools, memory, the A2A hookup). The proposed high-consequence refund proof
+  deliberately moves approval, idempotency, and issuance controls into
+  deterministic service code.
 
-## 3. Runtime Mental Model
+## 3. Boundaries for high-consequence actions
+
+The current prototype demonstrates the first boundary: **who owns a task**. The
+care coordinator owns customer interaction and routes refund work to a specialist
+over A2A. A production refund flow also needs two further boundaries. This
+repository includes a local, in-memory proof of those controls; it is not a
+claim that this PoC moves money.
+
+```mermaid
+flowchart LR
+    A[Customer request] --> B[Care coordinator]
+    B -->|Agent boundary: route work| C[Refund worker]
+    C -->|Tool boundary: read, quote, create request| D[Pending refund request]
+    D -->|Approval boundary: human reviewer approves| E[Controlled refund service]
+    E -->|valid approval + not already issued| F[Issued refund record]
+```
+
+| Boundary | Question | Control in this example |
+|---|---|---|
+| **Agent boundary** | Who owns this task? | The coordinator delegates refund work to the refund worker through A2A. |
+| **Tool boundary** | What may that agent do? | The worker can read scoped facts, calculate a quote, and create a pending request; it does not directly issue a refund. |
+| **Approval boundary** | Under what conditions may a high-risk action happen? | A deterministic service requires a valid human approval, correct state, and duplicate protection before recording a refund. |
+
+This is an application-level harness and governance concern. Prompts and skills
+express intended behavior; they are not a security boundary. The enforcement
+lives outside the model: least-privilege tool assignment, typed service inputs,
+approval-state checks, idempotent writes, and audit records. See
+[Tool and approval boundaries](docs/tool-boundary-runnable-proof-reference.md)
+for the local proof, test command, and its explicit non-goals.
+
+## 4. Runtime Mental Model
 
 ### Live request path — synchronous
 
@@ -95,7 +128,7 @@ asynchronous. Context assembly is always a live application responsibility:
 platforms provide storage and services, but do not decide what information is
 relevant for a model call.
 
-## 4. Harness & governance — built two ways
+## 5. Harness & governance — built two ways
 
 **Harness** is the runtime scaffolding (sessions, state, memory, tools, tracing);
 **governance** is the controls (PII guardrails, policies, audit, identity). These
@@ -128,7 +161,7 @@ org-scale**: registry and discovery, org-wide non-bypassable governance,
 multi-tenant identity, cross-agent audit — things one app cannot provide *for other
 agents*.
 
-## 5. The evaluation loop
+## 6. The evaluation loop
 
 The [**evaluation loop**](docs/eval-loop.md) runs on localhost, end-to-end across
 both agents, and pinpoints **which agent** failed on **two axes**: **trajectory**
@@ -144,7 +177,7 @@ catching what the offline check misses.
 The loop has **two jobs**: a pre-deploy **regression gate** and a post-deploy
 **data flywheel** (real traffic → human-in-the-loop → new golden → better agents).
 
-## 6. Run locally
+## 7. Run locally
 
 ```bash
 # terminal 1 — refund A2A server (start first; care needs its Agent Card)
@@ -164,7 +197,7 @@ call. The evaluation suite runs standalone:
 python3 eval/run_eval.py            # offline; add --live-judge for the real model
 ```
 
-## 7. Status
+## 8. Status
 
 Worker: ✅ built, traced, guarded, deployed (Cloud Run + Agent Engine).
 Coordinator: ✅ routing · slot-filling · A2A handoff · memory · session/state.
