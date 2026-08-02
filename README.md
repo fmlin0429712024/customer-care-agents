@@ -4,6 +4,31 @@ A two-agent customer-service system built with **Google ADK** and **A2A**. A
 conversational coordinator handles the customer; when the topic turns to a refund,
 it delegates to an independent specialist worker.
 
+## Overview
+
+**A two-agent (coordinator + worker) customer-care architecture — built to
+production-harden a pattern I first hit while scoping a customer-service +
+worker-agent flow on an enterprise logistics engagement (Navistar, international
+track, 2025).**
+
+> Background: that real-world engagement was the first time I ran into the
+> "conversational front desk + specialist execution agent" division of labor as
+> an architecture problem. This repo is my systematic validation of that
+> pattern — an independently reproducible build of both agent roles, plus the
+> production concerns (governance, harness, enterprise deployment on Vertex
+> Agent Engine) that a real rollout requires.
+
+**Why coordinator + worker instead of a single agent:** customer conversation is
+long-running, multi-turn, and intent is uncertain (a coordinator's strength);
+a refund decision is short, one-shot, and tightly rule-bound (a worker's
+strength). Splitting them into independent agents lets each scale and get
+tested on its own, and confines the high-consequence action (issuing a refund)
+inside one auditable boundary.
+
+**Core approach:** two independently deployable agents talking over a frozen A2A
+interface — the coordinator routes and never decides, the worker owns policy
+(approve / escalate / reject) behind an auditable tool boundary.
+
 ## 1. What's in this project
 
 Five pieces of engineering, each with its own deep-dive page:
